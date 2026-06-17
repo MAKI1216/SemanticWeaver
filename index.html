@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>语义缝合师 | Semantic Weaver</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="theme-clinic">
+
+    <!-- CRT 显示器特效覆盖层 -->
+    <div id="crt-overlay"></div>
+
+    <!-- ==================== 标题画面 ==================== -->
+    <div id="title-screen" class="screen active">
+        <div id="title-content">
+            <div id="title-glitch-wrapper">
+                <h1 id="title-text">语义缝合师</h1>
+            </div>
+            <p id="title-subtitle">Semantic Weaver</p>
+            <div id="title-buttons">
+                <button id="btn-new-game" class="title-btn">开始游戏</button>
+                <button id="btn-continue" class="title-btn" style="display:none;">继续游戏</button>
+            </div>
+            <p id="title-hint">—— 记忆是碎片，真相在缝隙 ——</p>
+        </div>
+    </div>
+
+    <!-- ==================== 游戏主画面 ==================== -->
+    <div id="game-screen" class="screen">
+        <!-- 顶部 HUD 状态栏 -->
+        <div id="hud">
+            <div id="hud-left">
+                <span id="hud-session">Session_ID: 014</span>
+            </div>
+            <div id="hud-center">
+                <span id="hud-progress-label">解析进度</span>
+                <div id="progress-bar">
+                    <div id="progress-fill"></div>
+                </div>
+            </div>
+            <div id="hud-right">
+                <span id="hud-mem">MEM: 45%</span>
+            </div>
+        </div>
+
+        <!-- 主内容区：左右分屏 -->
+        <div id="main-content">
+            <!-- 左半屏：会诊记录区 -->
+            <div id="dialogue-area">
+                <!-- NPC 半身立绘区域 -->
+                <div id="npc-portrait">
+                    <div id="npc-portrait-inner"></div>
+                </div>
+                <!-- NPC 名称 -->
+                <div id="npc-name"></div>
+                <!-- 对话文本区域（可滚动） -->
+                <div id="dialogue-scroll">
+                    <div id="dialogue-history"></div>
+                    <div id="dialogue-current"></div>
+                </div>
+                <!-- 提交区域（金色卡片拖回时显示） -->
+                <div id="submit-zone">
+                    <span>将最终线索拖到这里提交</span>
+                </div>
+                <!-- 试炼4特殊目标区域 -->
+                <div id="special-target-zone" style="display:none;">
+                    <span>集团云端数据库</span>
+                </div>
+                <!-- 阶段提示 -->
+                <div id="stage-hint" style="display:none;"></div>
+            </div>
+
+            <!-- 右半屏：心理推演板 -->
+            <div id="evidence-board">
+                <!-- 板面卡片区域 -->
+                <div id="board-cards"></div>
+                <!-- 技能卡常驻栏 -->
+                <div id="skill-bar">
+                    <div class="skill-card" data-skill="视觉重构">
+                        <span class="skill-icon">👁</span>
+                        <span class="skill-name">视觉重构</span>
+                    </div>
+                    <div class="skill-card" data-skill="听觉重构">
+                        <span class="skill-icon">👂</span>
+                        <span class="skill-name">听觉重构</span>
+                    </div>
+                    <div class="skill-card" data-skill="嗅觉重构">
+                        <span class="skill-icon">👃</span>
+                        <span class="skill-name">嗅觉重构</span>
+                    </div>
+                </div>
+                <!-- 垃圾桶区域 -->
+                <div id="trash-zone">
+                    <span>🗑 废弃</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trial 过渡遮罩 -->
+        <div id="trial-transition" style="display:none;">
+            <div id="trial-transition-content">
+                <h2 id="trial-title"></h2>
+                <p id="trial-subtitle"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 结局画面 ==================== -->
+    <div id="ending-screen" class="screen" style="display:none;">
+        <div id="ending-content">
+            <h2 id="ending-title"></h2>
+            <div id="ending-text"></div>
+            <button id="btn-restart" class="title-btn" style="display:none;">重新开始</button>
+        </div>
+    </div>
+
+    <!-- ==================== 合成特效层 ==================== -->
+    <div id="combine-effect" style="display:none;"></div>
+    <div id="flash-overlay" style="display:none;"></div>
+    <div id="red-flash-overlay" style="display:none;"></div>
+
+    <!-- ==================== 脚本加载 ==================== -->
+    <script src="data/game-data.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/dialogue.js"></script>
+    <script src="js/board.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>

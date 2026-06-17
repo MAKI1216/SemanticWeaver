@@ -1,0 +1,1348 @@
+/* ================================================================
+   语义缝合师 (Semantic Weaver) - 全局样式
+   包含：双态主题、CRT效果、动画、卡片、拖拽、Glitch特效
+   ================================================================ */
+
+/* ==================== 基础重置 ==================== */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Courier New', 'Noto Sans SC', monospace;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+/* ==================== CSS 变量 - 诊所态(默认) ==================== */
+.theme-clinic {
+  --bg-primary: #1a1410;
+  --bg-secondary: #2a2018;
+  --bg-tertiary: #3a2e22;
+  --text-primary: #e8dcc8;
+  --text-secondary: #b8a888;
+  --text-muted: #8a7a60;
+  --accent-warm: #d4a056;
+  --accent-gold: #ffd700;
+  --accent-red: #cc3333;
+  --border-wood: #5a4a30;
+  --border-light: #7a6a50;
+  --board-bg: #8b7355;
+  --board-dot: #a09070;
+  --card-bg: #f5e6c8;
+  --card-border: #c4a870;
+  --card-text: #3a2e22;
+  --card-shadow: rgba(0, 0, 0, 0.3);
+  --keyword-bg: rgba(212, 160, 86, 0.25);
+  --keyword-border: #d4a056;
+  --keyword-text: #ffd700;
+  --hud-bg: rgba(30, 24, 16, 0.9);
+  --dialogue-bg: #1e1810;
+  --dialogue-border: #5a4a30;
+  --skill-bg: #2a4060;
+  --skill-border: #4a70a0;
+  --skill-text: #8ac0f0;
+  --skill-icon: #6ab0ff;
+  --trash-bg: rgba(80, 40, 40, 0.3);
+  --trash-border: #664444;
+  --progress-bg: #2a2018;
+  --progress-fill: #d4a056;
+  --flash-white: rgba(255, 255, 255, 0.8);
+  --flash-red: rgba(200, 40, 40, 0.4);
+  --submit-bg: rgba(212, 160, 86, 0.15);
+  --submit-border: #d4a056;
+  --crt-line: rgba(0, 0, 0, 0.08);
+  --vignette-color: rgba(0, 0, 0, 0.4);
+  --npc-portrait-bg: radial-gradient(ellipse at center, #3a2e22 0%, #1a1410 100%);
+}
+
+/* ==================== CSS 变量 - 审讯态 ==================== */
+.theme-interrogation {
+  --bg-primary: #0a0c10;
+  --bg-secondary: #10141c;
+  --bg-tertiary: #1a1e2c;
+  --text-primary: #c8d0e0;
+  --text-secondary: #7080a0;
+  --text-muted: #405060;
+  --accent-warm: #cc3333;
+  --accent-gold: #ff4444;
+  --accent-red: #ff0000;
+  --border-wood: #2a3040;
+  --border-light: #3a4a60;
+  --board-bg: #0a0e16;
+  --board-dot: #1a2030;
+  --card-bg: #1a2030;
+  --card-border: #304060;
+  --card-text: #80a0cc;
+  --card-shadow: rgba(0, 0, 0, 0.6);
+  --keyword-bg: rgba(200, 40, 40, 0.2);
+  --keyword-border: #cc3333;
+  --keyword-text: #ff4444;
+  --hud-bg: rgba(10, 12, 16, 0.95);
+  --dialogue-bg: #0a0c10;
+  --dialogue-border: #2a3040;
+  --skill-bg: #1a1020;
+  --skill-border: #603040;
+  --skill-text: #cc6080;
+  --skill-icon: #ff4080;
+  --trash-bg: rgba(60, 20, 20, 0.4);
+  --trash-border: #882222;
+  --progress-bg: #10141c;
+  --progress-fill: #cc3333;
+  --flash-white: rgba(255, 60, 60, 0.6);
+  --flash-red: rgba(255, 0, 0, 0.6);
+  --submit-bg: rgba(200, 40, 40, 0.15);
+  --submit-border: #cc3333;
+  --crt-line: rgba(0, 0, 0, 0.12);
+  --vignette-color: rgba(0, 0, 0, 0.6);
+  --npc-portrait-bg: radial-gradient(ellipse at center, #1a1020 0%, #0a0c10 100%);
+}
+
+/* ==================== CRT 显示器特效 ==================== */
+#crt-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  /* 扫描线 */
+  background: repeating-linear-gradient(
+    0deg,
+    var(--crt-line) 0px,
+    var(--crt-line) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* CRT 边缘暗角 */
+#crt-overlay::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 60%,
+    var(--vignette-color) 100%
+  );
+  pointer-events: none;
+}
+
+/* ==================== 画面通用 ==================== */
+.screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+}
+.screen.active {
+  display: flex;
+}
+
+/* ==================== 标题画面 ==================== */
+#title-screen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+}
+
+#title-content {
+  text-align: center;
+  animation: titleFadeIn 2s ease-out;
+}
+
+@keyframes titleFadeIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#title-glitch-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+#title-text {
+  font-size: 4rem;
+  font-weight: bold;
+  color: var(--text-primary);
+  letter-spacing: 0.3em;
+  text-shadow:
+    0 0 10px rgba(212, 160, 86, 0.5),
+    0 0 40px rgba(212, 160, 86, 0.2);
+  position: relative;
+}
+
+/* 标题 Glitch 效果 */
+#title-text::before,
+#title-text::after {
+  content: '语义缝合师';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+#title-text::before {
+  color: #cc3333;
+  clip-path: inset(0 0 65% 0);
+  animation: glitchTop 3s infinite linear alternate-reverse;
+}
+#title-text::after {
+  color: #3366cc;
+  clip-path: inset(65% 0 0 0);
+  animation: glitchBottom 2.5s infinite linear alternate-reverse;
+}
+
+@keyframes glitchTop {
+  0%, 90% { transform: translate(0); }
+  91% { transform: translate(-3px, 1px); }
+  93% { transform: translate(2px, -1px); }
+  95% { transform: translate(-1px, 2px); }
+  97% { transform: translate(3px, 0px); }
+  100% { transform: translate(0); }
+}
+
+@keyframes glitchBottom {
+  0%, 88% { transform: translate(0); }
+  89% { transform: translate(2px, -1px); }
+  92% { transform: translate(-3px, 1px); }
+  94% { transform: translate(1px, -2px); }
+  96% { transform: translate(-2px, 1px); }
+  100% { transform: translate(0); }
+}
+
+#title-subtitle {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  letter-spacing: 0.5em;
+  margin-top: 10px;
+}
+
+#title-buttons {
+  margin-top: 50px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: center;
+}
+
+.title-btn {
+  font-family: 'Courier New', monospace;
+  font-size: 1.1rem;
+  padding: 12px 40px;
+  background: transparent;
+  color: var(--accent-warm);
+  border: 1px solid var(--accent-warm);
+  cursor: pointer;
+  letter-spacing: 0.2em;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.title-btn:hover {
+  background: rgba(212, 160, 86, 0.15);
+  box-shadow: 0 0 20px rgba(212, 160, 86, 0.3);
+  transform: scale(1.02);
+}
+
+.title-btn:active {
+  transform: scale(0.98);
+}
+
+#title-hint {
+  margin-top: 60px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  letter-spacing: 0.3em;
+  opacity: 0.6;
+}
+
+/* ==================== 游戏主画面 ==================== */
+#game-screen {
+  flex-direction: column;
+  background: var(--bg-primary);
+}
+
+/* ==================== HUD 状态栏 ==================== */
+#hud {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: var(--hud-bg);
+  border-bottom: 1px solid var(--border-wood);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+#hud-left, #hud-right {
+  min-width: 160px;
+}
+
+#hud-right {
+  text-align: right;
+}
+
+#hud-session {
+  color: var(--text-secondary);
+  letter-spacing: 0.1em;
+}
+
+#hud-center {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: center;
+}
+
+#hud-progress-label {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+#progress-bar {
+  width: 200px;
+  height: 8px;
+  background: var(--progress-bg);
+  border: 1px solid var(--border-wood);
+  position: relative;
+  overflow: hidden;
+}
+
+#progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--progress-fill);
+  transition: width 0.5s ease;
+}
+
+#hud-mem {
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* HUD 警告态（Trial 4） */
+#hud.hud-warning #hud-session {
+  color: #ff0000;
+  animation: warningBlink 0.8s infinite;
+}
+
+#hud.hud-warning #hud-progress-label {
+  color: #ff0000;
+}
+
+#hud.hud-warning #progress-fill {
+  background: #ff0000;
+  box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+@keyframes warningBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ==================== 主内容区 - 左右分屏 ==================== */
+#main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ==================== 左半屏：会诊记录区 ==================== */
+#dialogue-area {
+  width: 50%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--dialogue-bg);
+  border-right: 2px solid var(--dialogue-border);
+  position: relative;
+  overflow: hidden;
+}
+
+/* NPC 立绘区域 */
+#npc-portrait {
+  height: 200px;
+  min-height: 200px;
+  background: var(--npc-portrait-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--dialogue-border);
+  position: relative;
+  overflow: hidden;
+}
+
+#npc-portrait-inner {
+  width: 160px;
+  height: 180px;
+  position: relative;
+}
+
+/* NPC 名称 */
+#npc-name {
+  padding: 8px 20px;
+  font-size: 0.9rem;
+  color: var(--accent-warm);
+  letter-spacing: 0.15em;
+  border-bottom: 1px solid var(--dialogue-border);
+  background: rgba(0,0,0,0.2);
+  flex-shrink: 0;
+}
+
+/* 对话文本区域 */
+#dialogue-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px 20px;
+  position: relative;
+}
+
+#dialogue-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+#dialogue-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+#dialogue-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-wood);
+  border-radius: 2px;
+}
+
+#dialogue-history {
+  /* 历史对话 */
+}
+
+.dialogue-line {
+  margin-bottom: 15px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.dialogue-line.current {
+  color: var(--text-primary);
+}
+
+/* 打字机光标 */
+.typewriter-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1.1em;
+  background: var(--accent-warm);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: cursorBlink 0.7s infinite;
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* 关键词高亮样式 */
+.keyword {
+  display: inline-block;
+  padding: 1px 8px;
+  margin: 0 2px;
+  background: var(--keyword-bg);
+  border: 1px solid var(--keyword-border);
+  border-radius: 3px;
+  color: var(--keyword-text);
+  cursor: grab;
+  font-weight: bold;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.keyword:hover {
+  background: rgba(212, 160, 86, 0.4);
+  box-shadow: 0 0 10px rgba(212, 160, 86, 0.3);
+  transform: scale(1.05);
+}
+
+.keyword.dragging {
+  opacity: 0.4;
+}
+
+.keyword.extracted {
+  opacity: 0.4;
+  text-decoration: line-through;
+  pointer-events: none;
+}
+
+/* 提交区域 */
+#submit-zone {
+  height: 50px;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--submit-bg);
+  border: 2px dashed var(--submit-border);
+  border-radius: 8px;
+  margin: 10px 15px;
+  color: var(--accent-warm);
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  opacity: 0.5;
+  transition: all 0.3s;
+}
+
+#submit-zone.active {
+  opacity: 1;
+  background: rgba(212, 160, 86, 0.25);
+  box-shadow: 0 0 20px rgba(212, 160, 86, 0.3);
+  transform: scale(1.02);
+}
+
+/* 试炼4特殊目标区域 */
+#special-target-zone {
+  height: 60px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(200, 40, 40, 0.15);
+  border: 2px solid #cc3333;
+  border-radius: 8px;
+  margin: 10px 15px;
+  color: #ff4444;
+  font-size: 0.95rem;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+  opacity: 0.5;
+  transition: all 0.3s;
+}
+
+#special-target-zone.active {
+  opacity: 1;
+  background: rgba(200, 40, 40, 0.3);
+  box-shadow: 0 0 30px rgba(255, 0, 0, 0.4);
+  animation: targetPulse 1s infinite;
+}
+
+@keyframes targetPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(255, 0, 0, 0.6); }
+}
+
+/* 阶段提示 */
+#stage-hint {
+  padding: 10px 20px;
+  font-size: 0.8rem;
+  color: var(--accent-warm);
+  letter-spacing: 0.1em;
+  background: rgba(212, 160, 86, 0.08);
+  border-top: 1px solid var(--dialogue-border);
+  flex-shrink: 0;
+}
+
+/* ==================== 右半屏：心理推演板 ==================== */
+#evidence-board {
+  width: 50%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 诊所态：软木板背景 */
+.theme-clinic #board-cards {
+  background:
+    radial-gradient(circle at 20% 30%, rgba(160, 144, 112, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(139, 115, 85, 0.3) 0%, transparent 50%),
+    linear-gradient(135deg, #8b7355 0%, #a09070 25%, #8b7355 50%, #a09070 75%, #8b7355 100%);
+  background-size: 100% 100%;
+}
+
+/* 审讯态：全息投影网格 */
+.theme-interrogation #board-cards {
+  background:
+    linear-gradient(0deg, transparent 24%, rgba(0, 255, 100, 0.03) 25%, rgba(0, 255, 100, 0.03) 26%, transparent 27%, transparent 74%, rgba(0, 255, 100, 0.03) 75%, rgba(0, 255, 100, 0.03) 76%, transparent 77%),
+    linear-gradient(90deg, transparent 24%, rgba(0, 255, 100, 0.03) 25%, rgba(0, 255, 100, 0.03) 26%, transparent 27%, transparent 74%, rgba(0, 255, 100, 0.03) 75%, rgba(0, 255, 100, 0.03) 76%, transparent 77%),
+    linear-gradient(135deg, #0a0e16 0%, #0f1420 50%, #0a0e16 100%);
+  background-size: 40px 40px, 40px 40px, 100% 100%;
+}
+
+/* 卡片区域 */
+#board-cards {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ==================== 卡片样式 ==================== */
+.board-card {
+  position: absolute;
+  padding: 10px 16px;
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 4px;
+  color: var(--card-text);
+  font-size: 0.9rem;
+  font-weight: bold;
+  cursor: grab;
+  box-shadow: 2px 2px 8px var(--card-shadow);
+  transition: box-shadow 0.2s, transform 0.1s;
+  z-index: 10;
+  max-width: 200px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.board-card:hover {
+  box-shadow: 4px 4px 16px var(--card-shadow);
+  z-index: 20;
+}
+
+.board-card.dragging {
+  cursor: grabbing;
+  opacity: 0.85;
+  z-index: 100;
+  box-shadow: 6px 6px 24px var(--card-shadow);
+  transform: scale(1.05);
+}
+
+.board-card.combine-target {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+}
+
+/* 诊所态：便利贴图钉效果 */
+.theme-clinic .board-card::before {
+  content: '📌';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  z-index: 1;
+}
+
+/* 审讯态：数据块效果 */
+.theme-interrogation .board-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  font-family: 'Courier New', monospace;
+  text-transform: none;
+  border-left: 3px solid var(--accent-warm);
+}
+
+.theme-interrogation .board-card::before {
+  content: '>';
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  color: var(--accent-red);
+  font-size: 0.7rem;
+}
+
+/* 金色最终线索卡片 */
+.board-card.golden {
+  background: linear-gradient(135deg, #ffd700 0%, #ffaa00 50%, #ffd700 100%);
+  border: 2px solid #ff8800;
+  color: #3a2000;
+  box-shadow:
+    0 0 15px rgba(255, 215, 0, 0.4),
+    2px 2px 8px var(--card-shadow);
+  animation: goldenGlow 2s infinite;
+}
+
+.theme-interrogation .board-card.golden {
+  background: linear-gradient(135deg, #ff4444 0%, #cc0000 50%, #ff4444 100%);
+  border: 2px solid #ff0000;
+  color: #ffffff;
+  box-shadow:
+    0 0 15px rgba(255, 0, 0, 0.5),
+    2px 2px 8px var(--card-shadow);
+}
+
+@keyframes goldenGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.4), 2px 2px 8px var(--card-shadow); }
+  50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.6), 2px 2px 8px var(--card-shadow); }
+}
+
+.board-card.golden::after {
+  content: '★';
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  font-size: 1.2rem;
+  color: #ff8800;
+  text-shadow: 0 0 5px rgba(255, 136, 0, 0.5);
+}
+
+.theme-interrogation .board-card.golden::after {
+  color: #ff0000;
+  text-shadow: 0 0 5px rgba(255, 0, 0, 0.5);
+}
+
+/* 合成动画 - 卡片生成 */
+.board-card.card-spawn {
+  animation: cardSpawn 0.5s ease-out;
+}
+
+@keyframes cardSpawn {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 卡片销毁动画 */
+.board-card.card-destroy {
+  animation: cardDestroy 0.4s ease-in forwards;
+}
+
+@keyframes cardDestroy {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.5; }
+  100% { transform: scale(0); opacity: 0; }
+}
+
+/* 卡片弹开动画（合成失败） */
+.board-card.card-bounce {
+  animation: cardBounce 0.4s ease-out;
+}
+
+@keyframes cardBounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(0.9) translateX(-10px); }
+  60% { transform: scale(1.05) translateX(5px); }
+  100% { transform: scale(1) translateX(0); }
+}
+
+/* ==================== 技能卡 ==================== */
+#skill-bar {
+  display: flex;
+  gap: 10px;
+  padding: 10px 15px;
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid var(--border-wood);
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.skill-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--skill-bg);
+  border: 1px solid var(--skill-border);
+  border-radius: 6px;
+  color: var(--skill-text);
+  font-size: 0.8rem;
+  cursor: grab;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.skill-card:hover {
+  background: var(--skill-bg);
+  box-shadow: 0 0 10px rgba(100, 180, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.skill-card .skill-icon {
+  font-size: 1rem;
+}
+
+.skill-card .skill-name {
+  font-weight: bold;
+  letter-spacing: 0.05em;
+}
+
+.skill-card.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+/* 审讯态技能卡 */
+.theme-interrogation .skill-card {
+  background: var(--skill-bg);
+  border-color: var(--skill-border);
+}
+
+/* ==================== 垃圾桶 ==================== */
+#trash-zone {
+  padding: 8px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--trash-bg);
+  border-top: 1px solid var(--trash-border);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+
+#trash-zone.active {
+  background: rgba(200, 40, 40, 0.3);
+  color: #ff4444;
+  box-shadow: 0 0 15px rgba(255, 0, 0, 0.2);
+}
+
+/* ==================== 拖拽幽灵元素 ==================== */
+.drag-ghost {
+  position: fixed;
+  padding: 10px 16px;
+  background: var(--card-bg);
+  border: 2px solid var(--accent-gold);
+  border-radius: 4px;
+  color: var(--card-text);
+  font-size: 0.9rem;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 10000;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+  opacity: 0.9;
+  transform: rotate(-3deg) scale(1.05);
+  white-space: nowrap;
+}
+
+.drag-ghost.ghost-golden {
+  background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+  border-color: #ff8800;
+  color: #3a2000;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+}
+
+.drag-ghost.ghost-skill {
+  background: var(--skill-bg);
+  border-color: var(--skill-border);
+  color: var(--skill-text);
+}
+
+/* ==================== 合成特效 ==================== */
+#combine-effect {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9998;
+}
+
+#combine-effect.success {
+  display: block;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 215, 0, 0.4) 40%, transparent 70%);
+  animation: combineSuccess 0.6s ease-out forwards;
+}
+
+@keyframes combineSuccess {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+}
+
+#combine-effect.fail {
+  display: block;
+  background: radial-gradient(circle, rgba(200, 40, 40, 0.5) 0%, transparent 70%);
+  animation: combineFail 0.4s ease-out forwards;
+}
+
+@keyframes combineFail {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+}
+
+/* 闪光覆盖层 */
+#flash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9997;
+}
+
+#flash-overlay.white {
+  display: block;
+  background: var(--flash-white);
+  animation: flashFade 0.5s ease-out forwards;
+}
+
+#red-flash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9997;
+}
+
+#red-flash-overlay.red {
+  display: block;
+  background: var(--flash-red);
+  animation: flashFade 0.5s ease-out forwards;
+  box-shadow: inset 0 0 100px rgba(200, 40, 40, 0.5);
+}
+
+@keyframes flashFade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ==================== Trial 过渡 ==================== */
+#trial-transition {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  animation: transitionFade 2.5s ease-in-out forwards;
+}
+
+#trial-transition-content {
+  text-align: center;
+}
+
+#trial-title {
+  font-size: 2.5rem;
+  color: var(--text-primary);
+  letter-spacing: 0.2em;
+  margin-bottom: 10px;
+}
+
+#trial-subtitle {
+  font-size: 1rem;
+  color: var(--text-muted);
+  letter-spacing: 0.3em;
+}
+
+@keyframes transitionFade {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ==================== 结局画面 ==================== */
+#ending-screen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  padding: 40px;
+  z-index: 600;
+}
+
+#ending-content {
+  max-width: 700px;
+  text-align: center;
+}
+
+#ending-title {
+  font-size: 2rem;
+  color: var(--text-primary);
+  letter-spacing: 0.2em;
+  margin-bottom: 30px;
+}
+
+#ending-text {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 2;
+  white-space: pre-line;
+}
+
+.ending-rebellion #ending-title {
+  color: #ffd700;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+}
+
+.ending-cowardice #ending-title {
+  color: #888;
+}
+
+#btn-restart {
+  margin-top: 40px;
+}
+
+/* ==================== Glitch 故障特效（Trial 4） ==================== */
+.glitch-active {
+  animation: glitchMain 0.3s infinite;
+}
+
+@keyframes glitchMain {
+  0% { transform: translate(0); filter: none; }
+  20% { transform: translate(-2px, 1px); filter: hue-rotate(90deg); }
+  40% { transform: translate(2px, -1px); filter: hue-rotate(-90deg); }
+  60% { transform: translate(-1px, 2px); filter: saturate(2); }
+  80% { transform: translate(1px, -2px); filter: hue-rotate(180deg); }
+  100% { transform: translate(0); filter: none; }
+}
+
+.glitch-text {
+  animation: glitchText 0.2s infinite;
+}
+
+@keyframes glitchText {
+  0%, 100% { text-shadow: 2px 0 #cc3333, -2px 0 #3366cc; }
+  25% { text-shadow: -2px 0 #cc3333, 2px 0 #3366cc; }
+  50% { text-shadow: 2px 2px #cc3333, -2px -2px #3366cc; }
+  75% { text-shadow: -2px 2px #cc3333, 2px -2px #3366cc; }
+}
+
+/* 间歇性剧烈故障 */
+.glitch-burst {
+  animation: glitchBurst 0.15s 3;
+}
+
+@keyframes glitchBurst {
+  0% { clip-path: inset(0 0 0 0); transform: translate(0); }
+  25% { clip-path: inset(20% 0 60% 0); transform: translate(-5px, 0); filter: hue-rotate(180deg); }
+  50% { clip-path: inset(50% 0 20% 0); transform: translate(5px, 0); filter: saturate(3); }
+  75% { clip-path: inset(10% 0 70% 0); transform: translate(-3px, 0); filter: hue-rotate(-90deg); }
+  100% { clip-path: inset(0 0 0 0); transform: translate(0); filter: none; }
+}
+
+/* ==================== 倒计时进度条（Trial 4） ==================== */
+.countdown-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: #cc3333;
+  z-index: 200;
+  transition: width 1s linear;
+  box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+/* ==================== NPC 肖像 CSS 艺术 ==================== */
+/* 数据快递员 */
+.npc-courier {
+  width: 120px;
+  height: 160px;
+  position: relative;
+  margin: 0 auto;
+}
+
+.npc-courier .npc-body {
+  width: 100px;
+  height: 80px;
+  background: linear-gradient(180deg, #666 0%, #555 100%);
+  border-radius: 10px 10px 0 0;
+  position: absolute;
+  bottom: 0;
+  left: 10px;
+}
+
+.npc-courier .npc-head {
+  width: 50px;
+  height: 55px;
+  background: #d4b896;
+  border-radius: 50%;
+  position: absolute;
+  bottom: 75px;
+  left: 35px;
+}
+
+.npc-courier .npc-hood {
+  width: 60px;
+  height: 40px;
+  background: #555;
+  border-radius: 50% 50% 0 0;
+  position: absolute;
+  bottom: 105px;
+  left: 30px;
+}
+
+.npc-courier .npc-rain {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    110deg,
+    transparent,
+    transparent 8px,
+    rgba(100, 150, 255, 0.15) 8px,
+    rgba(100, 150, 255, 0.15) 9px
+  );
+  animation: rainFall 0.5s linear infinite;
+}
+
+@keyframes rainFall {
+  from { background-position: 0 0; }
+  to { background-position: 20px 30px; }
+}
+
+/* 焦虑主妇 */
+.npc-housewife {
+  width: 120px;
+  height: 160px;
+  position: relative;
+  margin: 0 auto;
+}
+
+.npc-housewife .npc-body {
+  width: 100px;
+  height: 80px;
+  background: linear-gradient(180deg, #e8a0b0 0%, #c08090 100%);
+  border-radius: 10px 10px 0 0;
+  position: absolute;
+  bottom: 0;
+  left: 10px;
+}
+
+.npc-housewife .npc-apron {
+  width: 60px;
+  height: 60px;
+  background: #f0e0d0;
+  border-radius: 0 0 5px 5px;
+  position: absolute;
+  bottom: 5px;
+  left: 30px;
+  border: 1px dashed #c0a090;
+}
+
+.npc-housewife .npc-head {
+  width: 48px;
+  height: 52px;
+  background: #e0c8a8;
+  border-radius: 50%;
+  position: absolute;
+  bottom: 75px;
+  left: 36px;
+}
+
+.npc-housewife .npc-hair {
+  width: 55px;
+  height: 35px;
+  background: #4a3020;
+  border-radius: 50% 50% 0 0;
+  position: absolute;
+  bottom: 110px;
+  left: 32px;
+}
+
+.npc-housewife .npc-eyes {
+  position: absolute;
+  bottom: 85px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.npc-housewife .npc-eyes span {
+  width: 6px;
+  height: 6px;
+  background: #2a1a0a;
+  border-radius: 50%;
+  animation: nervousEyes 2s infinite;
+}
+
+@keyframes nervousEyes {
+  0%, 80%, 100% { transform: translateX(0); }
+  85% { transform: translateX(-2px); }
+  90% { transform: translateX(2px); }
+  95% { transform: translateX(-1px); }
+}
+
+/* PTSD雇佣兵 */
+.npc-mercenary {
+  width: 130px;
+  height: 160px;
+  position: relative;
+  margin: 0 auto;
+}
+
+.npc-mercenary .npc-body {
+  width: 110px;
+  height: 85px;
+  background: linear-gradient(180deg, #3a4a3a 0%, #2a3a2a 100%);
+  border-radius: 8px 8px 0 0;
+  position: absolute;
+  bottom: 0;
+  left: 10px;
+}
+
+.npc-mercenary .npc-head {
+  width: 52px;
+  height: 55px;
+  background: #c8a880;
+  border-radius: 50%;
+  position: absolute;
+  bottom: 78px;
+  left: 39px;
+}
+
+.npc-mercenary .npc-scar {
+  position: absolute;
+  bottom: 100px;
+  left: 55px;
+  width: 20px;
+  height: 2px;
+  background: #994444;
+  transform: rotate(-15deg);
+  box-shadow: 0 0 3px rgba(150, 40, 40, 0.5);
+}
+
+.npc-mercenary .npc-band {
+  width: 15px;
+  height: 5px;
+  background: #888;
+  position: absolute;
+  bottom: 30px;
+  right: 10px;
+  border-radius: 2px;
+}
+
+/* 系统（Trial 4 - 无肖像，仅故障效果） */
+.npc-system {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: #cc3333;
+  font-family: 'Courier New', monospace;
+  animation: systemPulse 1s infinite;
+}
+
+@keyframes systemPulse {
+  0%, 100% { opacity: 1; text-shadow: 0 0 20px rgba(255, 0, 0, 0.5); }
+  50% { opacity: 0.7; text-shadow: 0 0 40px rgba(255, 0, 0, 0.8); }
+}
+
+/* ==================== 试炼介绍对话（旁白样式） ==================== */
+.dialogue-narration {
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.8;
+  margin-bottom: 15px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--border-wood);
+}
+
+/* ==================== 系统日志样式（Trial 4） ==================== */
+.dialogue-system-log {
+  color: #cc3333;
+  font-family: 'Courier New', monospace;
+  line-height: 1.6;
+  font-size: 0.85rem;
+  white-space: pre-line;
+}
+
+.dialogue-system-log .keyword {
+  color: #ff4444;
+  border-color: #cc3333;
+  background: rgba(200, 40, 40, 0.2);
+}
+
+/* ==================== 响应式调整 ==================== */
+@media (max-width: 1024px) {
+  #main-content {
+    flex-direction: column;
+  }
+  #dialogue-area {
+    width: 100%;
+    height: 50%;
+    border-right: none;
+    border-bottom: 2px solid var(--dialogue-border);
+  }
+  #evidence-board {
+    width: 100%;
+    height: 50%;
+  }
+  #npc-portrait {
+    height: 120px;
+    min-height: 120px;
+  }
+  #title-text {
+    font-size: 2.5rem;
+  }
+}
+
+/* ==================== 暗转/亮转过渡 ==================== */
+.fade-transition {
+  animation: fadeTransition 1s ease;
+}
+
+@keyframes fadeTransition {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ==================== 消息提示 ==================== */
+.game-message {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 15px 30px;
+  background: rgba(0, 0, 0, 0.85);
+  color: var(--text-primary);
+  border: 1px solid var(--accent-warm);
+  border-radius: 8px;
+  font-size: 1rem;
+  z-index: 800;
+  pointer-events: none;
+  animation: messageFade 1.5s ease-out forwards;
+}
+
+@keyframes messageFade {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ==================== 无效合成的错误提示 ==================== */
+.combine-error {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 24px;
+  background: rgba(80, 20, 20, 0.9);
+  color: #ff6666;
+  border: 1px solid #cc3333;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  z-index: 800;
+  pointer-events: none;
+  animation: messageFade 1.5s ease-out forwards;
+}
