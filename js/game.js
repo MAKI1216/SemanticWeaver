@@ -27,6 +27,9 @@ var Game = (function() {
     stuckHintShown: { light: false, medium: false }  // 是否已显示提示
   };
 
+  // 保存 keyword_metadata 的原始深拷贝，用于"重启诊断"时恢复
+  var originalKeywordMetadata = null;
+
   var SAVE_VERSION = '1.1';
 
   // ==================== 存档系统 ====================
@@ -138,6 +141,34 @@ var Game = (function() {
    * 保存游戏进度到 localStorage
    */
   function saveGame() {
+    // 读取已有存档，保留 conclusion_type 等不被覆盖
+    var existingSave = null;
+    try {
+      var raw = localStorage.getItem('semantic_weaver_save');
+      if (raw) existingSave = JSON.parse(raw);
+    } catch (e) { /* 忽略 */ }
+
+    // 辅助函数：构建 trial state，保留已有的 conclusion_type 等数据
+    function buildTrialState(trialId) {
+      var status = state.completedTrials.indexOf(trialId) >= 0 ? 'completed'
+                 : (state.currentTrial === trialId ? 'in_progress' : 'locked');
+      var ts = createDefaultTrialState(status);
+      // 从已有存档恢复 conclusion_type 等字段
+      if (existingSave && existingSave.trials_state && existingSave.trials_state[trialId]) {
+        var old = existingSave.trials_state[trialId];
+        ts.conclusion_type = old.conclusion_type || null;
+        ts.conclusion_id = old.conclusion_id || null;
+        ts.hidden_keywords_found = old.hidden_keywords_found || [];
+        ts.contradictions_flagged = old.contradictions_flagged || [];
+        ts.meta_intrusions_performed = old.meta_intrusions_performed || [];
+      }
+      // 同时从内存 state.conclusionTypes 补充（confirmConclusion 设置的）
+      if (state.conclusionTypes && state.conclusionTypes[trialId]) {
+        ts.conclusion_type = state.conclusionTypes[trialId];
+      }
+      return ts;
+    }
+
     var saveData = {
       version: SAVE_VERSION,
       // 向后兼容字段
@@ -153,9 +184,9 @@ var Game = (function() {
       endings_seen: state.endingsSeen.slice(),
       playthrough_history: [],  // Phase 4+ 填充
       trials_state: {
-        trial_1: createDefaultTrialState(state.completedTrials.indexOf('trial_1') >= 0 ? 'completed' : (state.currentTrial === 'trial_1' ? 'in_progress' : 'locked')),
-        trial_2: createDefaultTrialState(state.completedTrials.indexOf('trial_2') >= 0 ? 'completed' : (state.currentTrial === 'trial_2' ? 'in_progress' : 'locked')),
-        trial_3: createDefaultTrialState(state.completedTrials.indexOf('trial_3') >= 0 ? 'completed' : (state.currentTrial === 'trial_3' ? 'in_progress' : 'locked')),
+        trial_1: buildTrialState('trial_1'),
+        trial_2: buildTrialState('trial_2'),
+        trial_3: buildTrialState('trial_3'),
         trial_4: {
           status: state.isTrial4Active ? 'in_progress' : (state.completedTrials.indexOf('trial_4') >= 0 ? 'completed' : 'locked'),
           ending_reached: null
@@ -431,7 +462,11 @@ var Game = (function() {
     var matchedConclusion = null;
     for (var i = 0; i < stageData.conclusions.length; i++) {
       var conc = stageData.conclusions[i];
+      // 优先检查 recipe.result，同时 fallback 到 label（双重保障）
       if (conc.recipe && conc.recipe.result === cardText) {
+        matchedConclusion = conc;
+        break;
+      } else if (conc.label === cardText) {
         matchedConclusion = conc;
         break;
       }
@@ -722,6 +757,7 @@ var Game = (function() {
     BoardSystem.initGlobalListeners();
     BoardSystem.initResetButton();
     BoardSystem.initMarkContradictionButton();
+    initTrialRestartButton();
 
     // 绑定回调
     BoardSystem.setCallbacks({
@@ -768,6 +804,16 @@ var Game = (function() {
     state.totalPlaythroughs = saveData.total_playthroughs || 1;
     state.endingsSeen = saveData.endings_seen || [];
 
+    // 从存档恢复 conclusionTypes（关键：决定 Trial 4 入口判定）
+    state.conclusionTypes = {};
+    if (saveData.trials_state) {
+      ['trial_1', 'trial_2', 'trial_3'].forEach(function(tid) {
+        if (saveData.trials_state[tid] && saveData.trials_state[tid].conclusion_type) {
+          state.conclusionTypes[tid] = saveData.trials_state[tid].conclusion_type;
+        }
+      });
+    }
+
     Renderer.showScreen('game-screen');
     Renderer.setTheme(state.theme, true);
     Renderer.startMemFlicker();
@@ -778,6 +824,7 @@ var Game = (function() {
     BoardSystem.initGlobalListeners();
     BoardSystem.initResetButton();
     BoardSystem.initMarkContradictionButton();
+    initTrialRestartButton();
 
     BoardSystem.setCallbacks({
       onCombine: onCombineSuccess,
@@ -794,6 +841,9 @@ var Game = (function() {
     initBoardObserver();
 
     updateHUDForTrial(state.currentTrial);
+
+    // 重放当前 Trial 中当前 Stage 之前的所有历史对话到 dialogue-history
+    replayHistoryDialogues(state.currentTrial, state.currentStage);
 
     if (state.currentTrial && state.currentStage) {
       var trialData = GAME_DATA.trials[state.currentTrial];
@@ -813,6 +863,30 @@ var Game = (function() {
       }
     } else {
       startTrial('trial_1');
+    }
+  }
+
+  /**
+   * 继续游戏时，重放当前 Trial 中当前 Stage 之前的所有历史对话
+   * 将历史对话追加到 dialogue-history 区域，不带动画
+   * @param {string} trialId - 当前 Trial ID
+   * @param {string} stageId - 当前 Stage ID
+   */
+  function replayHistoryDialogues(trialId, stageId) {
+    var trialData = GAME_DATA.trials[trialId];
+    if (!trialData || !trialData.stages) return;
+
+    var stageIds = Object.keys(trialData.stages);
+    var currentIndex = stageIds.indexOf(stageId);
+    if (currentIndex <= 0) return; // 当前就是第一个 Stage，无需重放
+
+    // 遍历当前 Stage 之前的所有 Stage
+    for (var i = 0; i < currentIndex; i++) {
+      var prevStageId = stageIds[i];
+      var prevStageData = trialData.stages[prevStageId];
+      if (prevStageData && prevStageData.dialogue) {
+        DialogueSystem.appendToHistory(prevStageData.dialogue);
+      }
     }
   }
 
@@ -905,11 +979,71 @@ var Game = (function() {
   }
 
   /**
+   * 防卡关检测：检查最终 Stage 是否缺少真结论所需的隐藏关键词
+   * 如果缺少，延迟显示 NPC 暗示引导玩家使用 Meta 卡
+   * @param {Object} stageData - 当前 Stage 数据
+   */
+  function checkMissingHiddenKeywords(stageData) {
+    if (!stageData.conclusions) return;
+
+    // 找到需要隐藏关键词的真结论
+    var trueConclusion = null;
+    for (var i = 0; i < stageData.conclusions.length; i++) {
+      if (stageData.conclusions[i].type === 'true' &&
+          stageData.conclusions[i].requires_hidden_keywords &&
+          stageData.conclusions[i].requires_hidden_keywords.length > 0) {
+        trueConclusion = stageData.conclusions[i];
+        break;
+      }
+    }
+    if (!trueConclusion) return;
+
+    // 检查推演板上是否已有这些关键词
+    var allCards = BoardSystem.getAllCards();
+    var cardTexts = allCards.map(function(c) { return c.text; });
+    var missingKeywords = trueConclusion.requires_hidden_keywords.filter(function(kw) {
+      return cardTexts.indexOf(kw) === -1;
+    });
+
+    if (missingKeywords.length > 0) {
+      // 延迟 15 秒后显示提示（给玩家先尝试合成的时间）
+      setTimeout(function() {
+        // 再次检查（玩家可能在这段时间内通过 Meta 入侵获得了关键词）
+        var currentCards = BoardSystem.getAllCards();
+        var currentTexts = currentCards.map(function(c) { return c.text; });
+        var stillMissing = missingKeywords.filter(function(kw) {
+          return currentTexts.indexOf(kw) === -1;
+        });
+
+        if (stillMissing.length > 0) {
+          // 找出当前 Trial 中哪些 Stage 有 hidden_layer_meta_card
+          var trialData = GAME_DATA.trials[state.currentTrial];
+          var metaHints = [];
+          for (var sid in trialData.stages) {
+            if (trialData.stages[sid].hidden_layer_meta_card) {
+              metaHints.push(trialData.stages[sid].hidden_layer_meta_card);
+            }
+          }
+
+          var hintMsg = '（她突然压低声音，像是想起了什么。）\n\n「医生……我总觉得有些东西被我漏掉了。那些'
+                      + metaHints.join('、')
+                      + '……你有没有试过把它们拖到这里来看看？也许它们能看到我看不到的东西。」';
+
+          DialogueSystem.showNarration(hintMsg);
+        }
+      }, 15000);
+    }
+  }
+
+  /**
    * 运行指定 Stage
    */
   function runStage(trialId, stageId) {
     var trialData = GAME_DATA.trials[trialId];
     if (!trialData || !trialData.stages[stageId]) return;
+
+    // 先判断是否为新 Trial（在更新 state 之前）
+    var isNewTrial = (state.currentTrial !== trialId);
 
     state.currentTrial = trialId;
     state.currentStage = stageId;
@@ -922,8 +1056,20 @@ var Game = (function() {
 
     var stageData = trialData.stages[stageId];
 
-    // 设置所需提交线索
-    BoardSystem.setRequiredSubmit(stageData.required_submit);
+    // 设置所需提交线索（包含结论产物，使真/假结论卡都能拖入提交区）
+    var conclusionTargets = [];
+    if (stageData.is_final_stage && stageData.conclusions) {
+      stageData.conclusions.forEach(function(conc) {
+        if (conc.label) conclusionTargets.push(conc.label);
+        if (conc.recipe && conc.recipe.result) conclusionTargets.push(conc.recipe.result);
+      });
+    }
+    BoardSystem.setRequiredSubmit(stageData.required_submit, conclusionTargets);
+
+    // 防卡关：最终 Stage 检查是否缺少真结论所需的隐藏关键词
+    if (stageData.is_final_stage && stageData.conclusions) {
+      checkMissingHiddenKeywords(stageData);
+    }
 
     // Phase 3: 设置隐藏台词层
     if (stageData.hidden_layer) {
@@ -944,11 +1090,13 @@ var Game = (function() {
     var totalProgress = ((trialIndex + (stageIndex + 1) / stageIds.length) / trialKeys.length) * 100;
     Renderer.updateHUD({ progress: totalProgress });
 
-    // 清空推演板上的旧卡片
-    BoardSystem.clearBoard();
-
     // 将上一段对话归档
     DialogueSystem.archiveCurrentDialogue();
+
+    // 只有进入新 Trial 时才清空推演板；同 Trial 内换 Stage 保留卡片
+    if (isNewTrial) {
+      BoardSystem.clearBoard();
+    }
 
     // 显示对话
     var isSystemLog = (trialId === 'trial_4');
@@ -1030,7 +1178,7 @@ var Game = (function() {
     }
 
     // === Phase B: 检查结论类型 ===
-    // Trial 1/2/3 完成后检查是否应该进入假结局
+    // Trial 1/2/3 完成后记录结论类型
     if (trialId === 'trial_1' || trialId === 'trial_2' || trialId === 'trial_3') {
       // 记录到 state.conclusionTypes
       if (!state.conclusionTypes) state.conclusionTypes = {};
@@ -1038,6 +1186,14 @@ var Game = (function() {
         var save = loadGame();
         if (save && save.trials_state && save.trials_state[trialId]) {
           state.conclusionTypes[trialId] = save.trials_state[trialId].conclusion_type;
+        }
+        // Trial 3 完成时，重新读取所有三个 Trial 的结论类型（防止内存丢失）
+        if (trialId === 'trial_3') {
+          ['trial_1', 'trial_2', 'trial_3'].forEach(function(tid) {
+            if (save && save.trials_state && save.trials_state[tid] && save.trials_state[tid].conclusion_type) {
+              state.conclusionTypes[tid] = save.trials_state[tid].conclusion_type;
+            }
+          });
         }
       } catch (e) { /* 忽略 */ }
     }
@@ -1339,12 +1495,114 @@ var Game = (function() {
   // ==================== 初始化 ====================
 
   /**
+   * 初始化"重启诊断"按钮
+   */
+  function initTrialRestartButton() {
+    var btn = document.getElementById('trial-restart-btn');
+    if (!btn) return;
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = 'true';
+
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      showRestartConfirm();
+    });
+  }
+
+  /**
+   * 显示重启诊断确认弹窗
+   */
+  function showRestartConfirm() {
+    var overlay = document.createElement('div');
+    overlay.className = 'reset-confirm-overlay';
+    overlay.innerHTML =
+      '<div class="reset-confirm-dialog">' +
+        '<p class="reset-confirm-text">重启本关诊断？所有推演板卡片和已提取关键词将清空，本关从头开始。</p>' +
+        '<div class="reset-confirm-buttons">' +
+          '<button class="reset-btn-confirm">确认重启</button>' +
+          '<button class="reset-btn-cancel">再想想</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('.reset-btn-confirm').addEventListener('click', function() {
+      document.body.removeChild(overlay);
+      restartCurrentTrial();
+    });
+    overlay.querySelector('.reset-btn-cancel').addEventListener('click', function() {
+      document.body.removeChild(overlay);
+    });
+  }
+
+  /**
+   * 重启当前 Trial：彻底重置所有运行时状态，从 Stage 1 重新开始
+   */
+  function restartCurrentTrial() {
+    if (!state.currentTrial) return;
+
+    // 1. 恢复 keyword_metadata 到原始状态（深拷贝）
+    if (originalKeywordMetadata) {
+      GAME_DATA.keyword_metadata = JSON.parse(JSON.stringify(originalKeywordMetadata));
+    }
+
+    // 2. 重置当前 Trial 的存档状态（直接操作 localStorage）
+    try {
+      var rawSave = localStorage.getItem('semantic_weaver_save');
+      if (rawSave) {
+        var saveObj = JSON.parse(rawSave);
+        if (saveObj.trials_state && saveObj.trials_state[state.currentTrial]) {
+          saveObj.trials_state[state.currentTrial].conclusion_type = null;
+          saveObj.trials_state[state.currentTrial].conclusion_id = null;
+          saveObj.trials_state[state.currentTrial].hidden_keywords_found = [];
+          saveObj.trials_state[state.currentTrial].contradictions_flagged = [];
+          saveObj.trials_state[state.currentTrial].meta_intrusions_performed = [];
+          saveObj.trials_state[state.currentTrial].stages_completed = [];
+        }
+        localStorage.setItem('semantic_weaver_save', JSON.stringify(saveObj));
+      }
+    } catch (e) { /* 忽略 */ }
+
+    // 同时清理内存中的 conclusionTypes（当前 Trial）
+    if (state.conclusionTypes) {
+      delete state.conclusionTypes[state.currentTrial];
+    }
+
+    // 3. 重置防卡关计数
+    state.combineFailCount = 0;
+    state.stuckHintShown = { light: false, medium: false };
+
+    // 4. 清空推演板和对话
+    BoardSystem.clearBoard();
+    BoardSystem.initSkillCards();
+    DialogueSystem.clearDialogue();
+    DialogueSystem.clearHiddenLayer();
+
+    // 5. 保存并重启当前 Trial
+    saveGame();
+
+    // 6. 如果是 Trial 4，需要重新启动倒计时
+    if (state.isTrial4Active) {
+      Renderer.stopGlitch();
+      stopCountdown();
+    }
+
+    Renderer.showMessage('诊断已重启', 'game-message');
+    startTrial(state.currentTrial);
+  }
+
+  /**
    * 初始化游戏（绑定标题画面按钮事件）
    */
   function init() {
     var btnNew = document.getElementById('btn-new-game');
     var btnContinue = document.getElementById('btn-continue');
     var btnRestart = document.getElementById('btn-restart');
+
+    // 保存 keyword_metadata 的原始深拷贝（用于"重启诊断"恢复）
+    if (GAME_DATA.keyword_metadata && !originalKeywordMetadata) {
+      originalKeywordMetadata = JSON.parse(JSON.stringify(GAME_DATA.keyword_metadata));
+    }
 
     // Phase A.5/A.6: 初始化教程系统和过场动画系统
     TutorialSystem.init();

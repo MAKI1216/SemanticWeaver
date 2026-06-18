@@ -396,6 +396,38 @@ var DialogueSystem = (function() {
     }
   }
 
+  /**
+   * 将对话文本直接追加到历史记录区域（用于继续游戏时重放历史对话）
+   * 不带动画，直接显示完整文本，保留关键词可提取能力
+   * @param {string} text - 对话文本（支持 {关键词} 和 （旁白）语法）
+   */
+  function appendToHistory(text) {
+    var historyEl = document.getElementById('dialogue-history');
+    if (!historyEl || !text) return;
+
+    var line = document.createElement('div');
+    line.className = 'dialogue-line';
+    line.innerHTML = parseDialogueText(text);
+    historyEl.appendChild(line);
+
+    // 为新追加的历史对话中的关键词绑定拖拽事件
+    var keywords = line.querySelectorAll('.keyword');
+    keywords.forEach(function(kwSpan) {
+      if (!kwSpan.dataset.bound) {
+        kwSpan.dataset.bound = 'true';
+        kwSpan.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (onKeywordDragStart) {
+            onKeywordDragStart(kwSpan.dataset.keyword, e, kwSpan);
+          }
+        });
+      }
+    });
+
+    Renderer.scrollDialogueToBottom();
+  }
+
   // ==================== Phase 3: 隐藏台词层 ====================
 
   /**
@@ -513,6 +545,7 @@ var DialogueSystem = (function() {
     revealHiddenLayer: revealHiddenLayer,
     hasHiddenLayer: hasHiddenLayer,
     clearHiddenLayer: clearHiddenLayer,
-    getCurrentHiddenLayerGate: getCurrentHiddenLayerGate
+    getCurrentHiddenLayerGate: getCurrentHiddenLayerGate,
+    appendToHistory: appendToHistory
   };
 })();

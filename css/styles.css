@@ -1561,6 +1561,31 @@ html, body {
   box-shadow: 0 0 8px rgba(212, 160, 86, 0.2);
 }
 
+/* ==================== 重启诊断按钮 ==================== */
+#trial-restart-btn {
+  position: absolute;
+  top: 8px;
+  right: 70px;
+  z-index: 50;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-wood);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: all 0.3s;
+}
+
+#trial-restart-btn:hover {
+  opacity: 0.9;
+  color: var(--accent-warm);
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 8px rgba(212, 160, 86, 0.2);
+}
+
 /* ==================== 推演板重置确认弹窗 ==================== */
 .reset-confirm-overlay {
   position: fixed;
@@ -1750,7 +1775,7 @@ html, body {
 #mark-contradiction-btn {
   position: absolute;
   top: 8px;
-  right: 80px;
+  right: 175px;
   z-index: 50;
   padding: 5px 12px;
   background: rgba(0, 0, 0, 0.5);

@@ -57,7 +57,7 @@ var GAME_DATA = {
               "type": "true",
               "label": "第七号死信箱的数据芯片",
               "requires_hidden_keywords": ["死信箱", "交接点"],
-              "recipe": { "required_keywords": ["死信箱", "交接点"], "result": "第七号死信箱的数据芯片" },
+              "recipe": { "required_keywords": ["加密交接协议", "地下冷冻室的铁盒"], "result": "第七号死信箱的数据芯片" },
               "npc_reaction": {
                 "phase_1": { "emotion": "unsettled", "dialogue": "你……你怎么会看到这个。死信箱？那是什么？我没说过这个词。我不认识这个词。" },
                 "crt_effect": { "intensity": "subtle", "description": "扫描线轻微抖动800ms，画面亮度降低10%，微弱电流杂音" },
@@ -140,8 +140,8 @@ var GAME_DATA = {
           "required_submit": "叛军家属的联络名单",
           "next_stage": null,
           "hint": "「这条项链……他让我藏好它，说那是我们的希望。医生，你能看到我看不见的东西吗？」",
-          "hidden_layer": "频段#47.3MHz，每周二/五 22:00-23:00 活跃，关联设备：搪瓷杯底部发射器",
-          "hidden_layer_keywords": [],
+          "hidden_layer": "频段#{目标编号}#047_47.3MHz，每周二/五 22:00-23:00 活跃，关联设备：{擦窗杯底部发射器}",
+          "hidden_layer_keywords": ["目标编号", "擦窗杯底部发射器"],
           "hidden_layer_meta_card": "信号溢出",
           "is_final_stage": true,
           "conclusions": [
@@ -162,7 +162,7 @@ var GAME_DATA = {
               "type": "true",
               "label": "清除目标的定位名单",
               "requires_hidden_keywords": ["清除目标", "定位"],
-              "recipe": { "required_keywords": ["清除目标", "定位", "叛军家属的联络名单"], "result": "清除目标的定位名单" },
+              "recipe": { "required_keywords": ["目标清除坐标", "叛军家属的联络名单"], "result": "清除目标的定位名单" },
               "npc_reaction": {
                 "phase_1": { "emotion": "unsettled", "dialogue": "清除……目标？你在说什么？我丈夫不是叛军，他不会……这不是联络名单？" },
                 "crt_effect": { "intensity": "moderate", "description": "扫描线抖动1000ms，画面偏红，0.3s静音后低频嗡鸣" },
@@ -204,7 +204,10 @@ var GAME_DATA = {
         "清除目标+定位": "目标清除坐标",
         "目标清除坐标+叛军家属的联络名单": "清除目标的定位名单",
         "加密名单的解密钥匙+一条项链": "项链中的加密数据",
-        "项链中的加密数据+要保护什么东西": "叛军家属的联络名单"
+        "项链中的加密数据+要保护什么东西": "叛军家属的联络名单",
+        "目标编号+听觉重构": "频段追踪信号",
+        "擦窗杯底部发射器+视觉重构": "定位发射器坐标",
+        "频段追踪信号+定位发射器坐标": "目标清除坐标"
       },
       "outro": "主妇的眼眶红了，但她没有哭。她死死攥着那条项链，吊坠嵌入掌心，留下一个圆形的印痕。她站起来的时候，椅子没有发出声音——她站得太轻了，像一片被风吹起的纸。\n\n「所以他没有疯。」她的声音很平，平得像结了一层冰的湖面。「他在保护我们。」\n\n她将项链塞回领口，第一次挺直了脊背，走向门口。走到一半她停下了，侧过头，没有看你。\n\n「医生……如果有一天我丈夫回来了，你能……再让我来一次吗？」\n\n你没来得及回答。门已经关上了。走廊里传来她的脚步声，急促但稳定，和进来时判若两人。\n\n你翻开档案的下一页。纸页之间夹着一张没有署名的便条，上面只有一个七位数字。你不知道它是谁的，也不知道它是什么时候被夹进去的。你把它放回原处，合上了档案。"
     },
@@ -282,7 +285,7 @@ var GAME_DATA = {
               "type": "true",
               "label": "记忆剥离协议的受害者",
               "requires_hidden_keywords": ["记忆剥离", "协议"],
-              "recipe": { "required_keywords": ["记忆剥离", "协议", "武器图纸的完整密码"], "result": "记忆剥离协议的受害者" },
+              "recipe": { "required_keywords": ["记忆剥离协议文档", "武器图纸的完整密码"], "result": "记忆剥离协议的受害者" },
               "npc_reaction": {
                 "phase_1": { "emotion": "unsettled", "dialogue": "记忆……剥离？什么协议？你在说什么？我不是什么协议的受害者。我是战俘。" },
                 "crt_effect": { "intensity": "intense", "description": "扫描线抖动1200ms，画面偏绿，心电监护仪声，NPC面部像素化" },

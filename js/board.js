@@ -9,6 +9,7 @@ var BoardSystem = (function() {
   var cards = [];         // 当前推演板上的所有卡片
   var cardIdCounter = 0;  // 卡片 ID 计数器
   var requiredSubmit = null; // 当前阶段需要提交的金色线索名称
+  var submittableCards = []; // 可提交的卡片名称数组（包含 required_submit + 结论产物）
 
   // ==================== 拖拽状态 ====================
   var dragState = {
@@ -44,10 +45,20 @@ var BoardSystem = (function() {
 
   /**
    * 设置当前阶段所需的提交线索
-   * @param {string} text - 金色线索名称
+   * @param {string} text - 金色线索名称（required_submit）
+   * @param {Array} [extraSubmittable] - 额外可提交的卡片名称数组（如结论产物）
    */
-  function setRequiredSubmit(text) {
+  function setRequiredSubmit(text, extraSubmittable) {
     requiredSubmit = text;
+    // 构建可提交列表：始终包含 required_submit + 额外的结论产物
+    submittableCards = text ? [text] : [];
+    if (extraSubmittable && Array.isArray(extraSubmittable)) {
+      extraSubmittable.forEach(function(c) {
+        if (c && submittableCards.indexOf(c) === -1) {
+          submittableCards.push(c);
+        }
+      });
+    }
   }
 
   // ==================== 卡片管理 ====================
@@ -81,8 +92,8 @@ var BoardSystem = (function() {
       metaTargets: meta.meta_targets || null  // Phase 3: Meta 关键词的入侵目标列表
     };
 
-    // 检查是否为金色（匹配 required_submit）
-    if (requiredSubmit && text === requiredSubmit) {
+    // 检查是否为金色（匹配 required_submit 或结论产物）
+    if (submittableCards.indexOf(text) !== -1) {
       cardData.isGolden = true;
     }
 
@@ -460,6 +471,34 @@ var BoardSystem = (function() {
         boardEl.innerHTML = '';
       }
       updateMarkButtonHint();
+
+      // ███ 修复Meta卡卡关：重置推演板时同步重置消耗标记 ███
+      // 1. 重置所有 meta 类型关键词的 consumed 状态，允许重置后重新提取
+      if (GAME_DATA && GAME_DATA.keyword_metadata) {
+        for (var kw in GAME_DATA.keyword_metadata) {
+          var m = GAME_DATA.keyword_metadata[kw];
+          if (m && m.card_type === 'meta') {
+            if (m.meta_consumed || m.is_extractable === false) {
+              m.meta_consumed = false;
+              m.is_extractable = true;
+            }
+          }
+        }
+      }
+      // 2. 重置当前 Trial 的 Meta 入侵执行记录，允许重置后重新入侵
+      if (state.currentTrial && state.trials_state[state.currentTrial]) {
+        state.trials_state[state.currentTrial].performed_meta_intrusions = {};
+      }
+
+      // 3. ███ 清理对话区域 Meta 关键词的消耗样式 ███
+      // 移除 meta-consumed 样式类和 data-bound 标记，使关键词恢复正常外观和可拖拽状态
+      var allKeywords = document.querySelectorAll('#dialogue-area .keyword');
+      allKeywords.forEach(function(kw) {
+        if (kw.classList.contains('meta-consumed')) {
+          kw.classList.remove('meta-consumed');
+          delete kw.dataset.bound;
+        }
+      });
     }, 400);
 
     // 显示 NPC 台词包装
@@ -748,8 +787,9 @@ var BoardSystem = (function() {
       }
     }
 
-    // 检查提交区域
-    if (dragState.source === 'card' && dragState.sourceData && dragState.sourceData.isGolden) {
+    // 检查提交区域（金色卡或结论产物卡均可提交）
+    if (dragState.source === 'card' && dragState.sourceData &&
+        (dragState.sourceData.isGolden || submittableCards.indexOf(dragState.sourceData.text) !== -1)) {
       var submitZone = document.getElementById('submit-zone');
       if (submitZone && submitZone.style.display !== 'none') {
         var submitRect = submitZone.getBoundingClientRect();
