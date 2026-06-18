@@ -435,26 +435,48 @@ var Renderer = (function() {
    * 创建/更新倒计时进度条（Trial 4）
    * @param {number} percent - 剩余百分比 (0-100)
    */
-  function updateCountdownBar(percent) {
+  /**
+   * 更新倒计时显示（Trial 4 屏幕中央红色闪烁倒计时，格式 MM:SS）
+   * @param {number} remaining - 剩余秒数
+   * @param {number} total - 总秒数
+   */
+  function updateCountdownDisplay(remaining, total) {
     if (!countdownBar) {
       countdownBar = document.createElement('div');
-      countdownBar.className = 'countdown-bar';
+      countdownBar.id = 'countdown-display';
+      countdownBar.innerHTML = '<div id="countdown-label">记忆格式化</div><div id="countdown-time"></div>';
       var gameScreen = document.getElementById('game-screen');
       if (gameScreen) {
         gameScreen.appendChild(countdownBar);
       }
+      // 添加红色氛围：屏幕边缘红光脉动
+      document.body.classList.add('countdown-active');
     }
-    countdownBar.style.width = Math.max(0, percent) + '%';
+
+    var timeEl = document.getElementById('countdown-time');
+    if (timeEl) {
+      var minutes = Math.floor(remaining / 60);
+      var seconds = remaining % 60;
+      timeEl.textContent = (minutes < 10 ? '0' : '') + minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+
+      // 最后15秒狂闪
+      if (remaining <= 15) {
+        countdownBar.classList.add('countdown-critical');
+      } else if (remaining <= 30) {
+        countdownBar.classList.add('countdown-warning');
+      }
+    }
   }
 
   /**
-   * 移除倒计时进度条
+   * 移除倒计时显示
    */
   function removeCountdownBar() {
     if (countdownBar && countdownBar.parentNode) {
       countdownBar.parentNode.removeChild(countdownBar);
       countdownBar = null;
     }
+    document.body.classList.remove('countdown-active');
   }
 
   // ==================== HUD 内存数值跳动 ====================
@@ -506,7 +528,7 @@ var Renderer = (function() {
     activateSpecialTarget: activateSpecialTarget,
     showHint: showHint,
     scrollDialogueToBottom: scrollDialogueToBottom,
-    updateCountdownBar: updateCountdownBar,
+    updateCountdownDisplay: updateCountdownDisplay,
     removeCountdownBar: removeCountdownBar,
     startMemFlicker: startMemFlicker,
     stopMemFlicker: stopMemFlicker

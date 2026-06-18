@@ -346,7 +346,7 @@ var GAME_DATA = {
       "special": {
         "force_theme": "interrogation",
         "glitch": true,
-        "countdown_seconds": 180,
+        "countdown_seconds": 60,
         "special_target": "集团云端数据库",
         "countdown_label": "记忆格式化进度"
       },

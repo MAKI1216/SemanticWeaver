@@ -403,6 +403,12 @@ var Game = (function() {
    * 提交卡片回调（含 Trial 4 特殊逻辑 + Phase B 真假结论系统）
    * @param {string} cardText - 提交的卡片文本
    * @param {boolean} isSpecialTarget - 是否提交到特殊目标（集团云端数据库）
+   *
+   * Trial 4 规则：
+   *   - 普通提交区始终隐藏，只有特殊目标（集团云端数据库）可用
+   *   - Stage 01/02：提交到特殊目标 → 匹配 required_submit → 推进下一 Stage（正常流程）
+   *   - Stage 03（最终 Stage）：提交到特殊目标 → 匹配 required_submit → 触发 Ending A
+   *   - 倒计时归零 → 触发 Ending B（由 startCountdown 处理）
    */
   function onSubmitCard(cardText, isSpecialTarget) {
     if (state.gameOver) return;
@@ -413,33 +419,32 @@ var Game = (function() {
     var stageData = trialData.stages[state.currentStage];
     if (!stageData) return;
 
-    // Trial 4 安全守卫：普通提交区不接受金色卡片
+    // Trial 4：普通提交区已隐藏，拒收所有非特殊目标提交
     if (state.isTrial4Active && !isSpecialTarget) {
       Renderer.showMessage('需要更强大的目标……将线索拖向集团云端数据库！', 'combine-error');
       AudioManager.playFail();
       return;
     }
 
-    // Trial 4 特殊目标处理
-    if (state.isTrial4Active && isSpecialTarget) {
-      if (cardText === stageData.required_submit) {
-        AudioManager.playSubmit();
-        triggerEndingA();
-      } else {
-        Renderer.showMessage('这不够强大……', 'combine-error');
-        AudioManager.playFail();
-      }
-      return;
-    }
-
-    // === Phase B: 真假结论系统 ===
-    // 最终 Stage 有 conclusions[] 时走结论判定流程
+    // === Phase B: 真假结论系统（Trial 1/2/3 最终 Stage） ===
     if (stageData.is_final_stage && stageData.conclusions && stageData.conclusions.length > 0) {
       handleConclusionSubmit(cardText, stageData);
       return;
     }
 
-    // 普通提交验证（非最终 Stage）
+    // === Trial 4 最终 Stage：提交到特殊目标 → Ending A ===
+    if (state.isTrial4Active && isSpecialTarget && stageData.is_final_stage) {
+      if (cardText === stageData.required_submit) {
+        AudioManager.playSubmit();
+        triggerEndingA();
+      } else {
+        Renderer.showMessage('这不够强大……这不足以击穿防火墙。', 'combine-error');
+        AudioManager.playFail();
+      }
+      return;
+    }
+
+    // === 普通提交验证（Trial 1/2/3 非最终 Stage，或 Trial 4 非最终 Stage） ===
     if (cardText === stageData.required_submit) {
       AudioManager.playSubmit();
       Renderer.showFlash('white', 300);
@@ -936,6 +941,8 @@ var Game = (function() {
       }
 
       DialogueSystem.clearDialogue();
+      BoardSystem.clearBoard();
+      BoardSystem.initSkillCards();
       DialogueSystem.showNarration(trialData.intro, function() {
         var stageIds = Object.keys(trialData.stages);
         if (stageIds.length > 0) {
@@ -946,7 +953,10 @@ var Game = (function() {
       });
 
       if (state.isTrial4Active) {
-        startCountdown();
+        // 只有进入最终 Stage 才启动倒计时
+        if (stageData.is_final_stage) {
+          startCountdown();
+        }
       }
     });
   }
@@ -1096,6 +1106,11 @@ var Game = (function() {
     // 只有进入新 Trial 时才清空推演板；同 Trial 内换 Stage 保留卡片
     if (isNewTrial) {
       BoardSystem.clearBoard();
+    }
+
+    // Trial 4：进入最终 Stage 时启动倒计时
+    if (state.isTrial4Active && stageData.is_final_stage && !state.countdownTimer) {
+      startCountdown();
     }
 
     // 显示对话
@@ -1405,9 +1420,9 @@ var Game = (function() {
 
       state.countdownRemaining--;
 
-      var total = specialConfig.countdown_seconds || 180;
+      var total = specialConfig.countdown_seconds || 60;
       var percent = (state.countdownRemaining / total) * 100;
-      Renderer.updateCountdownBar(percent);
+      Renderer.updateCountdownDisplay(state.countdownRemaining, total);
       Renderer.updateHUD({ progress: 100 - percent });
 
       // 最后30秒倒计时音效
@@ -1592,6 +1607,91 @@ var Game = (function() {
   }
 
   /**
+   * 调试用：从指定 Trial 开始，前序关卡自动标记为真结论通过
+   * @param {string} targetTrial - 目标 Trial ID（'trial_1' ~ 'trial_4'）
+   */
+  function startFromTrial(targetTrial) {
+    AudioManager.resume();
+    deleteSaveGame();
+
+    // 重置状态
+    state.currentTrial = targetTrial;
+    state.currentStage = null;
+    state.completedTrials = [];
+    state.theme = 'clinic';
+    state.isTrial4Active = (targetTrial === 'trial_4');
+    state.gameOver = false;
+    state.currentPlaythrough = 1;
+    state.trial4Unlocked = (targetTrial === 'trial_4');
+    state.memoryEchoActive = false;
+    state.totalPlaythroughs = 1;
+    state.endingsSeen = [];
+    state.combineFailCount = 0;
+    state.stuckHintShown = { light: false, medium: false };
+    state.conclusionTypes = {};
+
+    // 确定前序关卡
+    var trialOrder = ['trial_1', 'trial_2', 'trial_3', 'trial_4'];
+    var targetIdx = trialOrder.indexOf(targetTrial);
+    if (targetIdx === -1) targetIdx = 0;
+
+    // 构建存档：前序 Trial 标记为已完成 + 真结论
+    for (var i = 0; i < targetIdx; i++) {
+      var tid = trialOrder[i];
+      state.completedTrials.push(tid);
+      state.conclusionTypes[tid] = 'true';
+    }
+
+    // 保存初始存档
+    var saveData = createDefaultSaveData();
+    saveData.currentTrial = targetTrial;
+    saveData.currentStage = null;
+    saveData.completedTrials = state.completedTrials.slice();
+    saveData.trial4_unlocked = (targetTrial === 'trial_4');
+
+    // 设置前序 Trial 的真结论状态
+    for (var j = 0; j < targetIdx; j++) {
+      var t = trialOrder[j];
+      saveData.trials_state[t].status = 'completed';
+      saveData.trials_state[t].conclusion_type = 'true';
+    }
+    // 当前 Trial
+    saveData.trials_state[targetTrial].status = 'in_progress';
+
+    try {
+      localStorage.setItem('semantic_weaver_save', JSON.stringify(saveData));
+    } catch (e) { /* 忽略 */ }
+
+    // 初始化 UI
+    Renderer.showScreen('game-screen');
+    Renderer.setTheme(state.isTrial4Active ? 'interrogation' : 'clinic', true);
+    Renderer.startMemFlicker();
+    updateHUDForTrial(targetTrial);
+
+    DialogueSystem.clearDialogue();
+    BoardSystem.clearBoard();
+    BoardSystem.initSkillCards();
+    BoardSystem.initGlobalListeners();
+    BoardSystem.initResetButton();
+    BoardSystem.initMarkContradictionButton();
+    initTrialRestartButton();
+
+    BoardSystem.setCallbacks({
+      onCombine: onCombineSuccess,
+      onCombineFail: onCombineFail,
+      onSubmit: onSubmitCard,
+      onCardDeleted: onCardDeleted,
+      onContradictionFlagged: onContradictionFlagged,
+      onMetaIntrusion: onMetaIntrusion
+    });
+
+    DialogueSystem.setKeywordDragCallback(createKeywordDragHandler());
+    initBoardObserver();
+
+    startTrial(targetTrial);
+  }
+
+  /**
    * 初始化游戏（绑定标题画面按钮事件）
    */
   function init() {
@@ -1633,6 +1733,25 @@ var Game = (function() {
       deleteSaveGame();
       location.reload();
     });
+
+    // === 调试关卡选择（由 debug-config.js 控制显隐） ===
+    if (typeof DEBUG_SHOW_TRIAL_SELECT !== 'undefined' && DEBUG_SHOW_TRIAL_SELECT === 'yes') {
+      var debugSelect = document.getElementById('debug-trial-select');
+      if (debugSelect) {
+        debugSelect.style.display = 'block';
+      }
+      // 绑定关卡选择按钮
+      var debugBtns = document.querySelectorAll('.debug-trial-btn');
+      debugBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var trialId = this.getAttribute('data-trial');
+          if (trialId) {
+            AudioManager.init();
+            startFromTrial(trialId);
+          }
+        });
+      });
+    }
 
     // Phase A.4: 页面加载后自动播放开场动画
     // 开场动画覆盖标题画面，播放完毕后淡出显示标题画面

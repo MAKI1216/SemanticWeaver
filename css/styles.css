@@ -288,6 +288,56 @@ html, body {
   opacity: 0.6;
 }
 
+/* ==================== 调试关卡选择 ==================== */
+#debug-trial-select {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  text-align: center;
+}
+
+#debug-select-label {
+  font-size: 0.75rem;
+  color: var(--accent-warm);
+  letter-spacing: 0.15em;
+  margin-bottom: 12px;
+  opacity: 0.7;
+}
+
+#debug-trial-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.debug-trial-btn {
+  padding: 6px 16px;
+  font-size: 0.8rem;
+  font-family: var(--font-mono, 'Courier New', monospace);
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.05em;
+}
+
+.debug-trial-btn:hover {
+  color: var(--accent-warm);
+  border-color: var(--accent-warm);
+  background: rgba(212, 160, 86, 0.08);
+  box-shadow: 0 0 8px rgba(212, 160, 86, 0.12);
+}
+
+#debug-select-desc {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  opacity: 0.4;
+  margin-top: 6px;
+}
+
 /* ==================== 游戏主画面 ==================== */
 #game-screen {
   flex-direction: column;
@@ -1202,16 +1252,101 @@ html, body {
 }
 
 /* ==================== 倒计时进度条（Trial 4） ==================== */
-.countdown-bar {
+/* ==================== Trial 4 倒计时显示 ==================== */
+#countdown-display {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 3px;
-  background: #cc3333;
-  z-index: 200;
-  transition: width 1s linear;
-  box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 300;
+  text-align: center;
+  pointer-events: none;
+  animation: countdown-pulse 2s ease-in-out infinite;
+}
+
+#countdown-label {
+  font-family: var(--font-mono, 'Courier New', monospace);
+  font-size: 0.75rem;
+  color: rgba(255, 60, 60, 0.7);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  text-shadow: 0 0 10px rgba(255, 0, 0, 0.4);
+}
+
+#countdown-time {
+  font-family: var(--font-mono, 'Courier New', monospace);
+  font-size: 4rem;
+  font-weight: bold;
+  color: #ff2020;
+  letter-spacing: 0.1em;
+  text-shadow:
+    0 0 20px rgba(255, 0, 0, 0.8),
+    0 0 40px rgba(255, 0, 0, 0.5),
+    0 0 80px rgba(255, 0, 0, 0.3),
+    0 0 120px rgba(255, 0, 0, 0.15);
+  animation: countdown-glow 1s ease-in-out infinite alternate;
+}
+
+/* 警告态（≤30秒）：加速脉动 */
+#countdown-display.countdown-warning #countdown-time {
+  color: #ff0000;
+  animation: countdown-glow 0.6s ease-in-out infinite alternate;
+  text-shadow:
+    0 0 30px rgba(255, 0, 0, 0.9),
+    0 0 60px rgba(255, 0, 0, 0.6),
+    0 0 100px rgba(255, 0, 0, 0.4);
+}
+
+/* 危急态（≤15秒）：狂闪 + 震动 */
+#countdown-display.countdown-critical {
+  animation: countdown-critical-flash 0.3s ease-in-out infinite;
+}
+
+#countdown-display.countdown-critical #countdown-time {
+  color: #ff0000;
+  font-size: 4.5rem;
+  animation: countdown-critical-glow 0.2s ease-in-out infinite alternate;
+  text-shadow:
+    0 0 40px rgba(255, 0, 0, 1),
+    0 0 80px rgba(255, 0, 0, 0.8),
+    0 0 140px rgba(255, 0, 0, 0.5);
+}
+
+@keyframes countdown-pulse {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+
+@keyframes countdown-glow {
+  0% { text-shadow: 0 0 20px rgba(255, 0, 0, 0.8), 0 0 40px rgba(255, 0, 0, 0.5), 0 0 80px rgba(255, 0, 0, 0.3); }
+  100% { text-shadow: 0 0 30px rgba(255, 0, 0, 1), 0 0 60px rgba(255, 0, 0, 0.7), 0 0 100px rgba(255, 0, 0, 0.5); }
+}
+
+@keyframes countdown-critical-flash {
+  0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+@keyframes countdown-critical-glow {
+  0% { text-shadow: 0 0 40px rgba(255, 0, 0, 1), 0 0 80px rgba(255, 0, 0, 0.8); }
+  100% { text-shadow: 0 0 60px rgba(255, 0, 0, 1), 0 0 120px rgba(255, 0, 0, 1), 0 0 180px rgba(255, 0, 0, 0.6); }
+}
+
+/* 倒计时期间红色氛围：屏幕边缘红光扫过 */
+body.countdown-active #game-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 299;
+  box-shadow: inset 0 0 80px rgba(255, 0, 0, 0.12), inset 0 0 200px rgba(255, 0, 0, 0.06);
+  animation: countdown-edge-pulse 3s ease-in-out infinite;
+}
+
+@keyframes countdown-edge-pulse {
+  0%, 100% { box-shadow: inset 0 0 80px rgba(255, 0, 0, 0.10), inset 0 0 200px rgba(255, 0, 0, 0.04); }
+  50% { box-shadow: inset 0 0 120px rgba(255, 0, 0, 0.18), inset 0 0 280px rgba(255, 0, 0, 0.08); }
 }
 
 /* ==================== NPC 肖像 CSS 艺术 ==================== */

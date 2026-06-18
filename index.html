@@ -22,6 +22,17 @@
                 <button id="btn-new-game" class="title-btn">开始游戏</button>
                 <button id="btn-continue" class="title-btn" style="display:none;">继续游戏</button>
             </div>
+            <!-- 调试关卡选择（由 debug-config.js 控制显隐） -->
+            <div id="debug-trial-select" style="display:none;">
+                <p id="debug-select-label">—— 调试：选择起始关卡 ——</p>
+                <div id="debug-trial-buttons">
+                    <button class="debug-trial-btn" data-trial="trial_1">Trial 1</button>
+                    <button class="debug-trial-btn" data-trial="trial_2">Trial 2</button>
+                    <button class="debug-trial-btn" data-trial="trial_3">Trial 3</button>
+                    <button class="debug-trial-btn" data-trial="trial_4">Trial 4</button>
+                </div>
+                <p id="debug-select-desc">选择后前序关卡自动标记为真结论通过</p>
+            </div>
             <p id="title-hint">—— 记忆是碎片，真相在缝隙 ——</p>
         </div>
     </div>
@@ -127,6 +138,8 @@
     <div id="red-flash-overlay" style="display:none;"></div>
 
     <!-- ==================== 脚本加载 ==================== -->
+    <!-- 调试配置（上线时修改 debug-config.js 中参数为 "no" 即可隐藏关卡选择） -->
+    <script src="debug-config.js"></script>
     <script src="data/game-data.js"></script>
     <script src="js/audio.js"></script>
     <script src="js/renderer.js"></script>
