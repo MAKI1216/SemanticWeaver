@@ -158,11 +158,26 @@ html, body {
   align-items: center;
   justify-content: center;
   background: var(--bg-primary);
+  position: relative;
+}
+
+#title-screen::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: url('../assets/img/backgrounds/bg_opening.png');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.12;
+  z-index: 0;
+  pointer-events: none;
 }
 
 #title-content {
   text-align: center;
   animation: titleFadeIn 2s ease-out;
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes titleFadeIn {
@@ -277,6 +292,33 @@ html, body {
 #game-screen {
   flex-direction: column;
   background: var(--bg-primary);
+  position: relative;
+}
+
+/* AI 生成背景图层 */
+#game-screen::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: url('../assets/img/backgrounds/bg_clinic.png');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.15;
+  z-index: 0;
+  transition: opacity 0.8s ease, background-image 0.8s ease;
+  pointer-events: none;
+}
+
+.theme-interrogation#game-screen::before,
+.theme-interrogation #game-screen::before {
+  background-image: url('../assets/img/backgrounds/bg_interrogation.png');
+  opacity: 0.2;
+}
+
+/* 确保 HUD 和主内容在背景层之上 */
+#hud, #main-content {
+  position: relative;
+  z-index: 1;
 }
 
 /* ==================== HUD 状态栏 ==================== */
@@ -402,6 +444,32 @@ html, body {
   position: relative;
 }
 
+/* AI 生成立绘图片 */
+.npc-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+  filter: contrast(1.1) saturate(0.85);
+  transition: filter 0.4s ease;
+}
+
+/* Trial 4 审讯主题下立绘偏色 */
+.theme-interrogation .npc-portrait-img {
+  filter: contrast(1.2) saturate(0.6) hue-rotate(-10deg) brightness(0.8);
+}
+
+/* CRT 异常时立绘故障效果 */
+.crt-anomaly .npc-portrait-img {
+  animation: npc-glitch 0.3s steps(2) infinite;
+}
+
+@keyframes npc-glitch {
+  0% { transform: translate(0); filter: contrast(1.3) hue-rotate(90deg); }
+  50% { transform: translate(-2px, 1px); filter: contrast(0.8) hue-rotate(180deg); }
+  100% { transform: translate(2px, -1px); filter: contrast(1.5) hue-rotate(270deg); }
+}
+
 /* NPC 名称 */
 #npc-name {
   padding: 8px 20px;
@@ -488,10 +556,15 @@ html, body {
   opacity: 0.4;
 }
 
+/* Phase 1.3: 关键词提取后仍可交互，仅轻微降低不透明度 */
+.keyword.extracted-once {
+  opacity: 0.7;
+}
+
+/* 保留 .extracted 类供 Phase 4+ 结论系统使用，但 Phase 1 不再使用 */
 .keyword.extracted {
   opacity: 0.4;
   text-decoration: line-through;
-  pointer-events: none;
 }
 
 /* 提交区域 */
@@ -735,6 +808,100 @@ html, body {
   30% { transform: scale(0.9) translateX(-10px); }
   60% { transform: scale(1.05) translateX(5px); }
   100% { transform: scale(1) translateX(0); }
+}
+
+/* ==================== 卡片类型样式（Phase 1 预留） ==================== */
+
+/* hidden 类型：乱码/噪点纹理，不可拖拽（Phase 2/3 解锁后变为 normal） */
+.board-card.card-type-hidden {
+  background: repeating-linear-gradient(
+    45deg,
+    #2a2a2a 0px, #2a2a2a 2px,
+    #333 2px, #333 4px
+  );
+  border-color: #555;
+  color: transparent;
+  cursor: not-allowed;
+  pointer-events: none;
+  position: relative;
+}
+.board-card.card-type-hidden::after {
+  content: '█▓▒░ ░▒▓█';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(180, 180, 180, 0.4);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+/* half_finished 类型：虚线边框 + 半透明（Phase 8 使用） */
+.board-card.card-type-half_finished {
+  border-style: dashed;
+  border-width: 2px;
+  opacity: 0.7;
+  background: rgba(245, 230, 200, 0.6);
+}
+
+/* distorted 类型：glitch 文字效果 + 随机色偏（Phase 2 使用） */
+.board-card.card-type-distorted {
+  animation: distortedGlitch 0.15s infinite;
+  border-color: #ff00ff;
+  color: #ff66ff;
+  text-shadow: 1px 0 #00ffff, -1px 0 #ff0000;
+}
+@keyframes distortedGlitch {
+  0% { transform: translate(0); }
+  25% { transform: translate(-1px, 1px); }
+  50% { transform: translate(1px, -1px); }
+  75% { transform: translate(-1px, -1px); }
+  100% { transform: translate(0); }
+}
+
+/* meta 类型：特殊金色边框 + 微弱脉动光晕（Phase 3 使用） */
+.board-card.card-type-meta {
+  border: 2px solid #ffd700;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3), 2px 2px 8px var(--card-shadow);
+  animation: metaPulse 2s infinite;
+}
+@keyframes metaPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.3), 2px 2px 8px var(--card-shadow); }
+  50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.5), 2px 2px 8px var(--card-shadow); }
+}
+
+/* ==================== 类型区分的卡片销毁动画 ==================== */
+
+/* distorted 卡片碎裂动画 */
+.board-card.card-destroy-glitch {
+  animation: cardDestroyGlitch 0.4s ease-in forwards;
+}
+@keyframes cardDestroyGlitch {
+  0% { transform: scale(1); opacity: 1; filter: none; }
+  30% { transform: scale(1.1) translate(-3px, 2px); filter: hue-rotate(180deg); clip-path: inset(20% 0 40% 0); }
+  60% { transform: scale(1.2) translate(3px, -2px); filter: saturate(3); clip-path: inset(50% 0 10% 0); }
+  100% { transform: scale(0.5); opacity: 0; clip-path: inset(80% 0 80% 0); }
+}
+
+/* hidden 卡片噪点消散动画 */
+.board-card.card-destroy-noise {
+  animation: cardDestroyNoise 0.4s ease-in forwards;
+}
+@keyframes cardDestroyNoise {
+  0% { transform: scale(1); opacity: 1; filter: blur(0); }
+  50% { transform: scale(1.05); opacity: 0.5; filter: blur(2px); }
+  100% { transform: scale(0.8); opacity: 0; filter: blur(6px); }
+}
+
+/* meta 卡片消散动画（金色光粒散开） */
+.board-card.card-destroy-meta {
+  animation: cardDestroyMeta 0.4s ease-in forwards;
+}
+@keyframes cardDestroyMeta {
+  0% { transform: scale(1); opacity: 1; box-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }
+  50% { transform: scale(1.3); opacity: 0.6; box-shadow: 0 0 30px rgba(255, 215, 0, 0.8); }
+  100% { transform: scale(0.3); opacity: 0; box-shadow: 0 0 50px rgba(255, 215, 0, 0); }
 }
 
 /* ==================== 技能卡 ==================== */
@@ -1257,6 +1424,28 @@ html, body {
   border-left: 2px solid var(--border-wood);
 }
 
+/* ==================== 对话内旁白文字（（）括号标注） ==================== */
+/* Phase A.1: NPC 台词中的旁白/动作描写，用斜体+稍暗颜色与「」台词区分 */
+.dialogue-paren {
+  font-style: italic;
+  color: var(--text-muted, #8a7a60);
+  opacity: 0.82;
+  display: inline;
+}
+
+/* 审讯态下旁白文字适配 */
+.theme-interrogation .dialogue-paren {
+  color: #6a5a50;
+  opacity: 0.75;
+}
+
+/* 系统日志态下不应用旁白样式（Trial 4 的 >>> 日志不需要斜体） */
+.dialogue-system-log .dialogue-paren {
+  font-style: normal;
+  opacity: 1;
+  color: inherit;
+}
+
 /* ==================== 系统日志样式（Trial 4） ==================== */
 .dialogue-system-log {
   color: #cc3333;
@@ -1345,4 +1534,1743 @@ html, body {
   z-index: 800;
   pointer-events: none;
   animation: messageFade 1.5s ease-out forwards;
+}
+
+/* ==================== 推演板重置按钮 ==================== */
+#board-reset-btn {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 50;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-wood);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: all 0.3s;
+}
+
+#board-reset-btn:hover {
+  opacity: 0.9;
+  color: var(--accent-warm);
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 8px rgba(212, 160, 86, 0.2);
+}
+
+/* ==================== 推演板重置确认弹窗 ==================== */
+.reset-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 900;
+  animation: resetOverlayFade 0.2s ease-out;
+}
+
+@keyframes resetOverlayFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.reset-confirm-dialog {
+  padding: 25px 35px;
+  background: var(--bg-secondary, #2a2018);
+  border: 1px solid var(--accent-warm, #d4a056);
+  border-radius: 10px;
+  text-align: center;
+  max-width: 360px;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+}
+
+.reset-confirm-text {
+  color: var(--text-primary, #e8dcc8);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.reset-confirm-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.reset-btn-confirm, .reset-btn-cancel {
+  padding: 8px 20px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-btn-confirm {
+  background: rgba(200, 40, 40, 0.2);
+  border: 1px solid #cc3333;
+  color: #ff6666;
+}
+
+.reset-btn-confirm:hover {
+  background: rgba(200, 40, 40, 0.4);
+  box-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
+}
+
+.reset-btn-cancel {
+  background: transparent;
+  border: 1px solid var(--text-muted, #8a7a60);
+  color: var(--text-secondary, #b8a888);
+}
+
+.reset-btn-cancel:hover {
+  border-color: var(--accent-warm, #d4a056);
+  color: var(--accent-warm, #d4a056);
+}
+
+/* ==================== Phase 2.2: 卡片属性图标条 ==================== */
+.card-attr-bar {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.card-attr-icon {
+  display: inline-block;
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.15);
+  cursor: help;
+  transition: all 0.15s;
+}
+
+.card-attr-icon:hover {
+  background: rgba(0, 0, 0, 0.3);
+  transform: scale(1.2);
+}
+
+/* 审讯态属性图标调整 */
+.theme-interrogation .card-attr-icon {
+  background: rgba(255, 255, 255, 0.1);
+}
+.theme-interrogation .card-attr-icon:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 金色卡片属性图标 */
+.board-card.golden .card-attr-icon {
+  background: rgba(0, 0, 0, 0.2);
+  color: #3a2000;
+}
+
+/* ==================== Phase 2.2: 属性检查面板 ==================== */
+.attr-panel {
+  position: fixed;
+  z-index: 700;
+  min-width: 200px;
+  max-width: 260px;
+  padding: 12px 16px;
+  background: rgba(20, 16, 12, 0.97);
+  border: 1px solid var(--accent-warm, #d4a056);
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+  font-family: 'Courier New', 'Noto Sans SC', monospace;
+  animation: attrPanelFade 0.15s ease-out;
+  pointer-events: auto;
+}
+
+@keyframes attrPanelFade {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.attr-panel-header {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: var(--text-primary, #e8dcc8);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-wood, #5a4a30);
+  word-break: break-all;
+}
+
+.attr-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.attr-panel-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #b8a888);
+}
+
+.attr-panel-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.attr-panel-name {
+  letter-spacing: 0.05em;
+}
+
+.attr-panel-empty {
+  font-size: 0.8rem;
+  color: var(--text-muted, #8a7a60);
+  font-style: italic;
+}
+
+.attr-panel-warning {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(200, 40, 40, 0.3);
+}
+
+.attr-panel-warning-line {
+  font-size: 0.75rem;
+  color: #ff6666;
+  line-height: 1.5;
+}
+
+/* ==================== Phase 2.4: 矛盾标记系统 ==================== */
+#mark-contradiction-btn {
+  position: absolute;
+  top: 8px;
+  right: 80px;
+  z-index: 50;
+  padding: 5px 12px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-wood, #5a4a30);
+  border-radius: 4px;
+  color: var(--text-muted, #8a7a60);
+  font-size: 0.72rem;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: all 0.3s;
+}
+
+/* 板上有 2+ 张卡片时，按钮微微发光提示可用 */
+#mark-contradiction-btn.hint-available {
+  opacity: 0.85;
+  border-color: rgba(212, 160, 86, 0.5);
+  color: var(--accent-warm, #d4a056);
+  animation: markBtnHint 2.5s infinite;
+}
+
+@keyframes markBtnHint {
+  0%, 100% { box-shadow: 0 0 4px rgba(212, 160, 86, 0.15); }
+  50% { box-shadow: 0 0 12px rgba(212, 160, 86, 0.3); }
+}
+
+#mark-contradiction-btn:hover {
+  opacity: 1;
+  color: var(--accent-warm, #d4a056);
+  border-color: var(--accent-warm, #d4a056);
+  box-shadow: 0 0 8px rgba(212, 160, 86, 0.2);
+}
+
+#mark-contradiction-btn.active {
+  opacity: 1;
+  background: rgba(200, 40, 40, 0.25);
+  border-color: #cc3333;
+  color: #ff6666;
+  box-shadow: 0 0 12px rgba(255, 0, 0, 0.3);
+  animation: markBtnPulse 1.5s infinite;
+}
+
+@keyframes markBtnPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 0, 0, 0.2); }
+  50% { box-shadow: 0 0 16px rgba(255, 0, 0, 0.4); }
+}
+
+/* 标记模式下推演板光标 */
+#board-cards.marking-mode {
+  cursor: crosshair;
+  box-shadow: inset 0 0 40px rgba(255, 50, 50, 0.08);
+}
+
+#board-cards.marking-mode .board-card {
+  cursor: pointer;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+#board-cards.marking-mode .board-card:hover {
+  border-color: rgba(255, 100, 100, 0.5) !important;
+  box-shadow: 0 0 10px rgba(255, 80, 80, 0.2) !important;
+}
+
+/* 标记选中的卡片 */
+.board-card.mark-selected {
+  border-color: #ff4444 !important;
+  box-shadow: 0 0 15px rgba(255, 68, 68, 0.5) !important;
+  animation: markSelectedPulse 0.8s infinite;
+}
+
+@keyframes markSelectedPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(255, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(255, 68, 68, 0.7); }
+}
+
+/* Phase 3: Meta 关键词在对话中的特殊样式 */
+.keyword.keyword-meta {
+  background: rgba(255, 215, 0, 0.12);
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  color: rgba(255, 215, 0, 0.9);
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.3);
+}
+
+.keyword.keyword-meta:hover {
+  background: rgba(255, 215, 0, 0.25);
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+}
+
+/* Meta 关键词消耗后变为不可交互 */
+.keyword.meta-consumed {
+  color: rgba(128, 128, 128, 0.4) !important;
+  text-decoration: line-through;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Phase 3: 隐藏台词层（Meta 入侵揭示的底层对话） */
+.dialogue-hidden-layer {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(0, 255, 100, 0.04);
+  border-left: 2px solid rgba(0, 255, 100, 0.3);
+  font-family: 'Courier New', 'Monaco', monospace;
+  font-size: 0.92em;
+  color: rgba(120, 255, 150, 0.85);
+  letter-spacing: 0.5px;
+  position: relative;
+}
+
+.dialogue-hidden-layer::before {
+  content: '▸ 底层记录';
+  display: block;
+  font-size: 0.7em;
+  color: rgba(0, 255, 100, 0.4);
+  margin-bottom: 4px;
+  letter-spacing: 1px;
+}
+
+.dialogue-hidden-layer .keyword {
+  color: rgba(100, 255, 130, 0.9);
+  border-bottom: 1px dashed rgba(0, 255, 100, 0.4);
+}
+
+/* 入场 glitch 动画 */
+.dialogue-hidden-layer.hidden-layer-glitch-in {
+  animation: hiddenLayerGlitchIn 0.8s ease-out;
+}
+
+@keyframes hiddenLayerGlitchIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+    filter: hue-rotate(90deg) blur(2px);
+    clip-path: inset(40% 0 40% 0);
+  }
+  30% {
+    opacity: 0.5;
+    transform: translateX(3px);
+    filter: hue-rotate(180deg) blur(1px);
+    clip-path: inset(10% 0 10% 0);
+  }
+  60% {
+    opacity: 0.8;
+    transform: translateX(-2px);
+    filter: hue-rotate(0deg) blur(0);
+    clip-path: inset(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+    filter: none;
+    clip-path: inset(0);
+  }
+}
+
+/* Meta 卡片拖放高亮：对话区域 */
+#dialogue-area.meta-drop-target {
+  box-shadow: inset 0 0 30px rgba(255, 215, 0, 0.3);
+  transition: box-shadow 0.2s;
+}
+
+#dialogue-area.meta-drop-target::after {
+  content: '⚡ 拖放到此入侵';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 215, 0, 0.8);
+  font-size: 1.2em;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 100;
+  animation: metaDropPulse 0.8s infinite;
+}
+
+@keyframes metaDropPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* 解锁关键词的对话行 */
+.dialogue-unlocked {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(255, 215, 0, 0.08);
+  border-left: 2px solid var(--accent-gold, #ffd700);
+  border-radius: 0 4px 4px 0;
+  animation: unlockedFade 0.5s ease-out;
+}
+
+@keyframes unlockedFade {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.unlocked-prefix {
+  font-size: 0.8rem;
+  color: var(--accent-gold, #ffd700);
+  margin-right: 6px;
+}
+
+.keyword-unlocked {
+  background: rgba(255, 215, 0, 0.3) !important;
+  border-color: var(--accent-gold, #ffd700) !important;
+  color: var(--accent-gold, #ffd700) !important;
+  animation: unlockedGlow 2s infinite;
+}
+
+@keyframes unlockedGlow {
+  0%, 100% { box-shadow: 0 0 5px rgba(255, 215, 0, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.6); }
+}
+
+/* ==================== Phase 2.5: 失真卡过载警告 ==================== */
+#board-cards.distorted-overload {
+  animation: overloadPulse 0.5s infinite;
+}
+
+@keyframes overloadPulse {
+  0%, 100% { box-shadow: inset 0 0 30px rgba(255, 0, 255, 0.1); }
+  50% { box-shadow: inset 0 0 60px rgba(255, 0, 255, 0.2); }
+}
+
+/* 过载状态下失真卡更明显 */
+#board-cards.distorted-overload .board-card.card-type-distorted {
+  animation: distortedGlitch 0.1s infinite, overloadDistorted 0.5s infinite;
+}
+
+@keyframes overloadDistorted {
+  0%, 100% { border-color: #ff00ff; box-shadow: 0 0 10px rgba(255, 0, 255, 0.4); }
+  50% { border-color: #ff0000; box-shadow: 0 0 20px rgba(255, 0, 0, 0.6); }
+}
+
+/* ================================================================
+   Phase A.5: 教程/引导弹窗系统样式
+   CRT 终端美学，NPC 口吻引导
+   ================================================================ */
+
+/* 教程遮罩层 - 覆盖全屏，阻止交互穿透 */
+.tutorial-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 10001;
+  opacity: 0;
+  transition: opacity 0.25s ease-in-out;
+  pointer-events: auto;
+}
+
+/* 遮罩可见态（淡入） */
+.tutorial-overlay.tutorial-visible {
+  opacity: 1;
+}
+
+/* 遮罩隐藏态（淡出） */
+.tutorial-overlay.tutorial-hiding {
+  opacity: 0;
+}
+
+/* 教程弹窗卡片 */
+.tutorial-dialog {
+  position: relative;
+  max-width: 460px;
+  width: 90%;
+  padding: 0;
+  background: var(--bg-secondary, #2a2018);
+  border: 1px solid var(--accent-warm, #d4a056);
+  border-radius: 8px;
+  box-shadow:
+    0 0 30px rgba(212, 160, 86, 0.2),
+    0 8px 32px rgba(0, 0, 0, 0.6);
+  font-family: 'Courier New', 'Noto Sans SC', monospace;
+  overflow: hidden;
+  transform: scale(0.9) translateY(20px);
+  opacity: 0;
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+/* 弹窗可见态 */
+.tutorial-overlay.tutorial-visible .tutorial-dialog {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+/* 弹窗隐藏态 */
+.tutorial-overlay.tutorial-hiding .tutorial-dialog {
+  transform: scale(0.95) translateY(10px);
+  opacity: 0;
+}
+
+/* 弹窗顶部扫描线装饰 */
+.tutorial-dialog::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent-warm, #d4a056) 50%,
+    transparent 100%
+  );
+  animation: tutorialScanLine 2s infinite;
+}
+
+@keyframes tutorialScanLine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* 弹窗头部区域（头像 + 名称/标题） */
+.tutorial-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid rgba(212, 160, 86, 0.2);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* NPC 头像区域 */
+.tutorial-avatar {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 引导者头像（CRT 终端风格抽象图标） */
+.tutorial-avatar-guide {
+  background: radial-gradient(
+    circle at center,
+    rgba(212, 160, 86, 0.3) 0%,
+    rgba(30, 24, 16, 0.8) 100%
+  );
+  border: 2px solid var(--accent-warm, #d4a056);
+  box-shadow:
+    0 0 12px rgba(212, 160, 86, 0.3),
+    inset 0 0 8px rgba(212, 160, 86, 0.15);
+}
+
+.tutorial-avatar-inner {
+  font-size: 1.6rem;
+  color: var(--accent-warm, #d4a056);
+  text-shadow: 0 0 8px rgba(212, 160, 86, 0.5);
+  animation: tutorialAvatarPulse 2s infinite;
+}
+
+@keyframes tutorialAvatarPulse {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* 头像扫描线效果 */
+.tutorial-avatar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 3px
+  );
+  pointer-events: none;
+}
+
+/* NPC 名称 + 标题容器 */
+.tutorial-name-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+/* NPC 名称 */
+.tutorial-npc-name {
+  font-size: 0.85rem;
+  color: var(--accent-warm, #d4a056);
+  letter-spacing: 0.15em;
+  margin-bottom: 2px;
+}
+
+/* 教程标题 */
+.tutorial-title {
+  font-size: 1.05rem;
+  font-weight: bold;
+  color: var(--text-primary, #e8dcc8);
+  letter-spacing: 0.08em;
+}
+
+/* 教程文案区域 */
+.tutorial-text {
+  padding: 18px 22px;
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: var(--text-secondary, #b8a888);
+  letter-spacing: 0.03em;
+  min-height: 60px;
+}
+
+/* "知道了" 按钮 */
+.tutorial-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 20px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid rgba(212, 160, 86, 0.2);
+  color: var(--accent-warm, #d4a056);
+  font-family: 'Courier New', 'Noto Sans SC', monospace;
+  font-size: 0.95rem;
+  letter-spacing: 0.3em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tutorial-btn:hover {
+  background: rgba(212, 160, 86, 0.12);
+  color: var(--accent-gold, #ffd700);
+  letter-spacing: 0.35em;
+}
+
+.tutorial-btn:active {
+  background: rgba(212, 160, 86, 0.2);
+}
+
+/* 审讯态下的教程弹窗调整 */
+.theme-interrogation .tutorial-dialog {
+  border-color: var(--accent-red, #cc3333);
+  box-shadow:
+    0 0 30px rgba(200, 40, 40, 0.2),
+    0 8px 32px rgba(0, 0, 0, 0.7);
+}
+
+.theme-interrogation .tutorial-avatar-guide {
+  border-color: var(--accent-red, #cc3333);
+  box-shadow:
+    0 0 12px rgba(200, 40, 40, 0.3),
+    inset 0 0 8px rgba(200, 40, 40, 0.15);
+  background: radial-gradient(
+    circle at center,
+    rgba(200, 40, 40, 0.3) 0%,
+    rgba(10, 12, 16, 0.8) 100%
+  );
+}
+
+.theme-interrogation .tutorial-avatar-inner {
+  color: var(--accent-red, #cc3333);
+  text-shadow: 0 0 8px rgba(200, 40, 40, 0.5);
+}
+
+.theme-interrogation .tutorial-npc-name {
+  color: var(--accent-red, #cc3333);
+}
+
+.theme-interrogation .tutorial-btn {
+  color: var(--accent-red, #cc3333);
+  border-top-color: rgba(200, 40, 40, 0.2);
+}
+
+.theme-interrogation .tutorial-btn:hover {
+  background: rgba(200, 40, 40, 0.12);
+  color: #ff4444;
+}
+
+/* 移动端适配 */
+@media (max-width: 600px) {
+  .tutorial-dialog {
+    width: 92%;
+    max-width: none;
+  }
+  .tutorial-header {
+    padding: 14px 16px 10px;
+  }
+  .tutorial-avatar {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+  .tutorial-avatar-inner {
+    font-size: 1.2rem;
+  }
+  .tutorial-text {
+    padding: 14px 16px;
+    font-size: 0.9rem;
+  }
+  .tutorial-btn {
+    padding: 12px 16px;
+    font-size: 0.9rem;
+  }
+}
+
+/* ================================================================
+   Phase A.6: 过场动画框架样式
+   ================================================================ */
+
+/* 过场全屏遮罩层 */
+.cutscene-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000000;
+  z-index: 10002;
+  opacity: 0;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+/* 过场文字层 */
+.cutscene-text-layer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+/* 过场文字基础样式 */
+.cutscene-text {
+  position: absolute;
+  max-width: 80%;
+  text-align: center;
+  font-family: 'Courier New', 'Noto Sans SC', monospace;
+  color: #e8dcc8;
+  line-height: 1.8;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+/* 文字可见态 */
+.cutscene-text-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 文字隐藏态 */
+.cutscene-text-hiding {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* 文字位置 */
+.cutscene-text-center {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) translateY(10px);
+}
+.cutscene-text-center.cutscene-text-visible {
+  transform: translate(-50%, -50%) translateY(0);
+}
+.cutscene-text-center.cutscene-text-hiding {
+  transform: translate(-50%, -50%) translateY(-10px);
+}
+
+.cutscene-text-top {
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+}
+.cutscene-text-top.cutscene-text-visible {
+  transform: translateX(-50%) translateY(0);
+}
+
+.cutscene-text-bottom {
+  bottom: 20%;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+}
+.cutscene-text-bottom.cutscene-text-visible {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* 文字样式变体 */
+.cutscene-text-title {
+  font-size: 1.8rem;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  color: #ffd700;
+  text-shadow:
+    0 0 20px rgba(255, 215, 0, 0.4),
+    0 0 40px rgba(255, 215, 0, 0.2);
+}
+
+.cutscene-text-subtitle {
+  font-size: 1.1rem;
+  letter-spacing: 0.15em;
+  color: #b8a888;
+}
+
+.cutscene-text-meta {
+  font-size: 0.85rem;
+  letter-spacing: 0.3em;
+  color: #8a7a60;
+  text-transform: uppercase;
+}
+
+.cutscene-text-system {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.05em;
+}
+
+.cutscene-text-question {
+  font-style: italic;
+  letter-spacing: 0.1em;
+}
+
+/* 跳过按钮 */
+.cutscene-skip-btn {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+  z-index: 10;
+  padding: 8px 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(212, 160, 86, 0.4);
+  border-radius: 4px;
+  color: rgba(212, 160, 86, 0.7);
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.2s;
+  opacity: 0.6;
+}
+
+.cutscene-skip-btn:hover {
+  opacity: 1;
+  background: rgba(212, 160, 86, 0.15);
+  border-color: var(--accent-warm, #d4a056);
+  color: var(--accent-warm, #d4a056);
+  box-shadow: 0 0 10px rgba(212, 160, 86, 0.2);
+}
+
+/* 过场故障效果（body 级别） */
+.cutscene-glitch {
+  animation: cutsceneGlitch 0.15s infinite;
+}
+
+@keyframes cutsceneGlitch {
+  0% { transform: translate(0); filter: none; }
+  20% { transform: translate(-3px, 2px); filter: hue-rotate(90deg) saturate(2); }
+  40% { transform: translate(3px, -2px); filter: hue-rotate(-90deg); }
+  60% { transform: translate(-2px, -3px); filter: hue-rotate(180deg) saturate(3); }
+  80% { transform: translate(2px, 3px); filter: hue-rotate(-180deg); }
+  100% { transform: translate(0); filter: none; }
+}
+
+/* CRT 扫描线抖动 */
+#crt-overlay.crt-shake {
+  animation: crtShake 0.1s infinite;
+}
+
+@keyframes crtShake {
+  0%, 100% { transform: translate(0); }
+  25% { transform: translate(-1px, 1px); }
+  50% { transform: translate(1px, -1px); }
+  75% { transform: translate(-1px, -1px); }
+}
+
+/* CRT 关闭效果（白色横线收缩） */
+.cutscene-crt-close {
+  width: 100%;
+  height: 2px;
+  background: #ffffff;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+  animation: crtCloseLine 1.5s ease-in forwards;
+  max-width: none;
+}
+
+@keyframes crtCloseLine {
+  0% {
+    width: 100%;
+    height: 2px;
+    opacity: 1;
+  }
+  40% {
+    width: 100%;
+    height: 4px;
+    opacity: 1;
+  }
+  70% {
+    width: 60%;
+    height: 2px;
+    opacity: 0.8;
+  }
+  100% {
+    width: 0%;
+    height: 1px;
+    opacity: 0;
+  }
+}
+
+/* 移动端过场适配 */
+@media (max-width: 600px) {
+  .cutscene-text {
+    max-width: 90%;
+    font-size: 0.9rem;
+  }
+  .cutscene-text-title {
+    font-size: 1.3rem;
+  }
+  .cutscene-text-subtitle {
+    font-size: 0.95rem;
+  }
+  .cutscene-skip-btn {
+    bottom: 15px;
+    right: 15px;
+    padding: 6px 14px;
+    font-size: 0.75rem;
+  }
+}
+
+/* ================================================================
+   Phase A.4: 开场动画样式
+   CSS 动画驱动的开场序列：雨夜街道 → 诊所内部 → CRT启动 → 标题
+   ================================================================ */
+
+/* 开场全屏遮罩 */
+.intro-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000000;
+  z-index: 10003;
+  opacity: 0;
+  overflow: hidden;
+}
+
+/* 场景容器 */
+.intro-scene-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 跳过按钮（复用过场按钮风格） */
+.intro-skip-btn {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+  z-index: 10;
+  padding: 8px 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(212, 160, 86, 0.4);
+  border-radius: 4px;
+  color: rgba(212, 160, 86, 0.7);
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.2s;
+  opacity: 0.6;
+}
+
+.intro-skip-btn:hover {
+  opacity: 1;
+  background: rgba(212, 160, 86, 0.15);
+  border-color: #d4a056;
+  color: #d4a056;
+}
+
+/* ==================== 场景基础 ==================== */
+
+.intro-scene {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* AI 生成漫画帧背景图 */
+.intro-scene-bg-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.35;
+  filter: contrast(1.1) saturate(0.7) brightness(0.6);
+  z-index: 0;
+}
+
+/* ==================== 雨夜街道场景 ==================== */
+
+.intro-scene-street {
+  background: linear-gradient(
+    180deg,
+    #0a0a14 0%,
+    #12121e 40%,
+    #1a1a28 70%,
+    #0e0e16 100%
+  );
+}
+
+/* 雨效果容器 */
+.intro-rain {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* 雨滴 */
+.intro-raindrop {
+  position: absolute;
+  top: -10%;
+  width: 1px;
+  height: 20px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(180, 200, 230, 0.3) 50%,
+    rgba(200, 220, 240, 0.5) 100%
+  );
+  animation: intro-rain-fall linear infinite;
+}
+
+@keyframes intro-rain-fall {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(120vh); }
+}
+
+/* 霓虹灯招牌 */
+.intro-neon-sign {
+  position: absolute;
+  top: 25%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 12px 32px;
+  border: 2px solid rgba(212, 160, 86, 0.3);
+  border-radius: 4px;
+  background: rgba(10, 10, 14, 0.6);
+}
+
+.intro-neon-text {
+  font-family: 'Courier New', 'Noto Sans SC', monospace;
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #d4a056;
+  text-shadow:
+    0 0 8px rgba(212, 160, 86, 0.8),
+    0 0 16px rgba(212, 160, 86, 0.5),
+    0 0 32px rgba(212, 160, 86, 0.3);
+  letter-spacing: 0.15em;
+}
+
+/* 霓虹灯闪烁 */
+.intro-neon-flicker .intro-neon-text {
+  animation: intro-neon-flicker-anim 3s infinite;
+}
+
+@keyframes intro-neon-flicker-anim {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.3; }
+  94% { opacity: 1; }
+  96% { opacity: 0.5; }
+  97% { opacity: 1; }
+}
+
+/* 模糊人影 */
+.intro-figure {
+  position: absolute;
+  bottom: 10%;
+  left: 50%;
+  width: 40px;
+  height: 120px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(20, 20, 30, 0.9) 0%,
+    rgba(20, 20, 30, 0.5) 60%,
+    transparent 100%
+  );
+  border-radius: 50% 50% 30% 30%;
+  z-index: 4;
+  transform: translateX(-50%) scale(0.8);
+  opacity: 0;
+  filter: blur(2px);
+}
+
+/* 人影走向门口 */
+.intro-figure-walking {
+  animation: intro-figure-walk 1.5s ease-in forwards;
+}
+
+@keyframes intro-figure-walk {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px) scale(0.6);
+  }
+  20% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-30px) scale(1.1);
+  }
+}
+
+/* 街道远处灯光 */
+.intro-street-lights {
+  position: absolute;
+  bottom: 15%;
+  left: 0;
+  width: 100%;
+  height: 30%;
+  background:
+    radial-gradient(ellipse at 20% 100%, rgba(212, 160, 86, 0.08) 0%, transparent 40%),
+    radial-gradient(ellipse at 70% 100%, rgba(100, 150, 200, 0.06) 0%, transparent 40%),
+    radial-gradient(ellipse at 90% 100%, rgba(200, 150, 100, 0.05) 0%, transparent 35%);
+  z-index: 1;
+}
+
+/* ==================== 诊所内部场景 ==================== */
+
+.intro-scene-clinic {
+  background: radial-gradient(
+    ellipse at 50% 60%,
+    #2a2018 0%,
+    #1a1410 50%,
+    #0a0806 100%
+  );
+}
+
+/* 台灯光晕 */
+.intro-lamp-glow {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 220, 140, 0.25) 0%,
+    rgba(212, 160, 86, 0.12) 30%,
+    transparent 70%
+  );
+  border-radius: 50%;
+  z-index: 1;
+  animation: intro-lamp-flicker 4s infinite;
+}
+
+@keyframes intro-lamp-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.92; }
+  75% { opacity: 0.96; }
+}
+
+/* 桌面暗示 */
+.intro-desk {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 30%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(90, 74, 48, 0.3) 60%,
+    rgba(60, 48, 30, 0.5) 100%
+  );
+  z-index: 1;
+}
+
+/* 档案文件 */
+.intro-file {
+  position: absolute;
+  bottom: 25%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 80px;
+  background: rgba(245, 230, 200, 0.15);
+  border: 1px solid rgba(196, 168, 112, 0.3);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  animation: intro-file-slide 2s ease-out forwards;
+}
+
+@keyframes intro-file-slide {
+  0% {
+    transform: translateX(-50%) translateY(40px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 0.8;
+  }
+}
+
+.intro-file-label {
+  font-family: 'Courier New', 'Noto Sans SC', monospace;
+  font-size: 0.8rem;
+  color: rgba(212, 160, 86, 0.5);
+  letter-spacing: 0.2em;
+}
+
+/* 诊所内文字 */
+.intro-text-clinic {
+  position: absolute;
+  top: 55%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  font-family: 'Courier New', 'Noto Sans SC', monospace;
+  font-size: 1rem;
+  color: #e8dcc8;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+/* ==================== CRT 启动场景 ==================== */
+
+.intro-scene-crt {
+  background: #000000;
+}
+
+/* CRT 扫描线 */
+.intro-crt-scanlines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  z-index: 1;
+}
+
+.intro-scanlines-active {
+  opacity: 1;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.3) 2px,
+    rgba(0, 0, 0, 0.3) 3px
+  );
+  animation: intro-scanlines-appear 0.5s ease-in;
+}
+
+@keyframes intro-scanlines-appear {
+  0% { opacity: 0; transform: scaleY(0.01); }
+  50% { opacity: 0.5; transform: scaleY(0.05); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
+
+/* CRT 扭曲效果 */
+.intro-crt-distortion {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(100, 200, 100, 0.03) 0%,
+    transparent 50%,
+    rgba(100, 200, 100, 0.02) 100%
+  );
+  z-index: 1;
+  animation: intro-crt-distort 0.3s infinite;
+}
+
+@keyframes intro-crt-distort {
+  0%, 100% { transform: translateX(0); }
+  33% { transform: translateX(-1px); }
+  66% { transform: translateX(1px); }
+}
+
+/* CRT 启动时画面扭曲（场景容器级别） */
+.intro-crt-boot {
+  animation: intro-crt-boot-anim 0.5s ease-out;
+}
+
+@keyframes intro-crt-boot-anim {
+  0% {
+    transform: scale(1, 1);
+    filter: brightness(1) hue-rotate(0deg);
+  }
+  30% {
+    transform: scale(1.02, 0.98);
+    filter: brightness(1.5) hue-rotate(20deg);
+  }
+  60% {
+    transform: scale(0.99, 1.01);
+    filter: brightness(0.8) hue-rotate(-10deg);
+  }
+  100% {
+    transform: scale(1, 1);
+    filter: brightness(1) hue-rotate(0deg);
+  }
+}
+
+/* 系统文字 */
+.intro-text-system {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  font-family: 'Courier New', monospace;
+  font-size: 0.95rem;
+  color: #00ff66;
+  text-shadow: 0 0 6px rgba(0, 255, 100, 0.4);
+  letter-spacing: 0.05em;
+}
+
+/* 文字闪烁 */
+.intro-text-blink {
+  animation: intro-text-blink-anim 0.8s infinite;
+}
+
+@keyframes intro-text-blink-anim {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ==================== 标题场景 ==================== */
+
+.intro-title-wrap {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+}
+
+/* 主标题 */
+.intro-title {
+  font-family: 'Courier New', 'Noto Sans SC', monospace;
+  font-size: 3.5rem;
+  font-weight: bold;
+  color: #e8dcc8;
+  letter-spacing: 0.3em;
+  text-shadow:
+    0 0 20px rgba(212, 160, 86, 0.4),
+    0 0 40px rgba(212, 160, 86, 0.2);
+  opacity: 0;
+}
+
+/* 标题 glitch 入场 */
+.intro-title-glitch-in {
+  animation: intro-title-glitch 0.8s ease-out forwards;
+}
+
+@keyframes intro-title-glitch {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px) skewX(10deg);
+    text-shadow:
+      3px 0 #cc3333,
+      -3px 0 #3333cc,
+      0 0 20px rgba(212, 160, 86, 0.4);
+    clip-path: inset(40% 0 40% 0);
+  }
+  30% {
+    opacity: 0.5;
+    transform: translateX(5px) skewX(-5deg);
+    text-shadow:
+      2px 0 #cc3333,
+      -2px 0 #3333cc,
+      0 0 20px rgba(212, 160, 86, 0.4);
+    clip-path: inset(10% 0 10% 0);
+  }
+  60% {
+    opacity: 0.8;
+    transform: translateX(-2px) skewX(2deg);
+    text-shadow:
+      1px 0 #cc3333,
+      -1px 0 #3333cc,
+      0 0 20px rgba(212, 160, 86, 0.4);
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) skewX(0);
+    text-shadow:
+      0 0 20px rgba(212, 160, 86, 0.4),
+      0 0 40px rgba(212, 160, 86, 0.2);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* 副标题 */
+.intro-subtitle {
+  font-family: 'Courier New', monospace;
+  font-size: 1.2rem;
+  color: #b8a888;
+  letter-spacing: 0.4em;
+  margin-top: 12px;
+  opacity: 0;
+}
+
+/* 点击提示 */
+.intro-click-hint {
+  font-family: 'Courier New', 'Noto Sans SC', monospace;
+  font-size: 0.9rem;
+  color: #8a7a60;
+  letter-spacing: 0.2em;
+  margin-top: 30px;
+  opacity: 0;
+}
+
+/* 淡入效果 */
+.intro-fade-in {
+  animation: intro-fade-in-anim 0.8s ease-out forwards;
+}
+
+@keyframes intro-fade-in-anim {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== 移动端适配 ==================== */
+
+@media (max-width: 600px) {
+  .intro-neon-text {
+    font-size: 1.2rem;
+  }
+  .intro-title {
+    font-size: 2.2rem;
+  }
+  .intro-subtitle {
+    font-size: 0.9rem;
+  }
+  .intro-click-hint {
+    font-size: 0.8rem;
+  }
+  .intro-text-clinic {
+    font-size: 0.85rem;
+  }
+  .intro-text-system {
+    font-size: 0.8rem;
+  }
+  .intro-skip-btn {
+    bottom: 15px;
+    right: 15px;
+    padding: 6px 14px;
+    font-size: 0.75rem;
+  }
+  .intro-lamp-glow {
+    width: 200px;
+    height: 200px;
+  }
+}
+
+/* ==================== Phase B: 结论确认框 ==================== */
+
+.conclusion-confirm-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease;
+}
+
+.conclusion-confirm-box {
+  background: var(--bg-secondary, #1a1410);
+  border: 1px solid var(--accent-gold, #d4a056);
+  border-radius: 8px;
+  padding: 30px 40px;
+  max-width: 480px;
+  text-align: center;
+  box-shadow: 0 0 30px rgba(212, 160, 86, 0.2);
+}
+
+.conclusion-confirm-label {
+  font-size: 0.85rem;
+  color: var(--accent-warm, #d4a056);
+  letter-spacing: 0.15em;
+  margin-bottom: 15px;
+}
+
+.conclusion-confirm-text {
+  font-size: 1.1rem;
+  color: var(--text-primary, #e8dcc8);
+  margin-bottom: 25px;
+  line-height: 1.6;
+}
+
+.conclusion-confirm-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.conclusion-btn {
+  padding: 10px 28px;
+  font-size: 0.9rem;
+  border: 1px solid var(--border-light, #5a4a3a);
+  background: var(--bg-tertiary, #2a2018);
+  color: var(--text-primary, #e8dcc8);
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+  transition: all 0.2s ease;
+}
+
+.conclusion-btn:hover {
+  background: var(--accent-gold, #d4a056);
+  color: var(--bg-primary, #1a1410);
+  border-color: var(--accent-gold, #d4a056);
+}
+
+.conclusion-btn-confirm {
+  border-color: var(--accent-gold, #d4a056);
+  color: var(--accent-gold, #d4a056);
+}
+
+/* ==================== Phase B: CRT 异常效果 ==================== */
+
+.crt-anomaly .npc-portrait-img {
+  animation: npc-glitch 0.3s steps(2) infinite;
+}
+
+.crt-anomaly-subtle #crt-overlay {
+  animation: crt-jitter-subtle 0.8s ease-out;
+}
+
+.crt-anomaly-moderate #crt-overlay {
+  animation: crt-jitter-moderate 1s ease-out;
+  filter: hue-rotate(-20deg) brightness(0.85);
+}
+
+.crt-anomaly-intense #crt-overlay {
+  animation: crt-jitter-intense 1.2s ease-out;
+  filter: hue-rotate(90deg) brightness(0.7);
+}
+
+.crt-anomaly-intense .npc-portrait-img {
+  filter: contrast(1.5) hue-rotate(90deg) !important;
+  animation: npc-pixelate 0.2s steps(3) infinite;
+}
+
+@keyframes crt-jitter-subtle {
+  0% { transform: translate(0); opacity: 1; }
+  20% { transform: translate(-1px, 0.5px); opacity: 0.95; }
+  40% { transform: translate(1px, -0.5px); opacity: 0.9; }
+  60% { transform: translate(-0.5px, 1px); opacity: 0.95; }
+  80% { transform: translate(0.5px, -1px); opacity: 0.97; }
+  100% { transform: translate(0); opacity: 1; }
+}
+
+@keyframes crt-jitter-moderate {
+  0% { transform: translate(0); }
+  15% { transform: translate(-3px, 1px); }
+  30% { transform: translate(3px, -1px); }
+  45% { transform: translate(-2px, 2px); }
+  60% { transform: translate(2px, -2px); }
+  75% { transform: translate(-1px, 1px); }
+  100% { transform: translate(0); }
+}
+
+@keyframes crt-jitter-intense {
+  0% { transform: translate(0) skew(0); }
+  10% { transform: translate(-5px, 2px) skew(0.5deg); }
+  20% { transform: translate(5px, -2px) skew(-0.5deg); }
+  30% { transform: translate(-4px, 3px) skew(0.3deg); }
+  40% { transform: translate(4px, -3px) skew(-0.3deg); }
+  50% { transform: translate(-3px, 1px) skew(0.2deg); }
+  60% { transform: translate(3px, -1px) skew(-0.2deg); }
+  70% { transform: translate(-2px, 2px) skew(0.1deg); }
+  80% { transform: translate(2px, -2px) skew(-0.1deg); }
+  90% { transform: translate(-1px, 1px); }
+  100% { transform: translate(0) skew(0); }
+}
+
+@keyframes npc-pixelate {
+  0% { filter: contrast(1.5) hue-rotate(90deg) pixelated(1); }
+  50% { filter: contrast(0.8) hue-rotate(180deg) blur(1px); }
+  100% { filter: contrast(1.5) hue-rotate(270deg); }
+}
+
+/* CRT 关闭效果（假结局开场） */
+.crt-shutdown {
+  animation: crt-shutdown 1.5s ease-in forwards;
+}
+
+@keyframes crt-shutdown {
+  0% { filter: brightness(1); transform: scale(1); }
+  60% { filter: brightness(0.3); transform: scale(1.01); }
+  80% { filter: brightness(0); transform: scaleY(0.005) scaleX(1.2); }
+  100% { filter: brightness(0); transform: scaleY(0) scaleX(0); opacity: 0; }
+}
+
+/* ==================== Phase B: 假结局序列 ==================== */
+
+.false-ending-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #000;
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.false-ending-text {
+  font-family: var(--font-mono, 'Courier New', monospace);
+  font-size: 1.1rem;
+  color: #c8c8c8;
+  line-height: 2;
+  text-align: center;
+  max-width: 600px;
+  padding: 0 30px;
+  white-space: pre-line;
+  letter-spacing: 0.05em;
+}
+
+.false-ending-dismiss {
+  font-family: var(--font-mono, 'Courier New', monospace);
+  font-size: 1rem;
+  color: #666;
+  margin-top: 40px;
+  font-style: italic;
+  opacity: 0;
+  animation: fadeIn 2s ease 0.5s forwards;
+}
+
+.false-ending-system {
+  font-family: var(--font-mono, 'Courier New', monospace);
+  font-size: 0.85rem;
+  color: #44aa44;
+  margin-top: 60px;
+  text-align: center;
+  letter-spacing: 0.1em;
+  opacity: 0;
+  animation: fadeIn 1s ease 0.3s forwards;
+}
+
+.false-ending-btn {
+  margin-top: 20px;
+  padding: 8px 30px;
+  background: transparent;
+  border: 1px solid #44aa44;
+  color: #44aa44;
+  font-family: var(--font-mono, 'Courier New', monospace);
+  font-size: 0.85rem;
+  cursor: pointer;
+  letter-spacing: 0.15em;
+  transition: all 0.2s ease;
+}
+
+.false-ending-btn:hover {
+  background: #44aa44;
+  color: #000;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ==================== Phase B: 防卡关提示 ==================== */
+
+.stuck-hint-npc {
+  font-style: italic;
+  color: var(--accent-warm, #d4a056);
+  opacity: 0.85;
+  padding: 8px 0;
+  animation: fadeIn 0.5s ease;
+}
+
+.card-pulse-hint {
+  animation: card-pulse 1.5s ease-in-out 3;
+}
+
+@keyframes card-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 160, 86, 0); }
+  50% { box-shadow: 0 0 12px 3px rgba(212, 160, 86, 0.4); }
 }

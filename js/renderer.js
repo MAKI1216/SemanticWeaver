@@ -114,28 +114,26 @@ var Renderer = (function() {
     inner.innerHTML = '';
     inner.className = portraitClass || '';
 
-    // 根据 NPC 类型构建 CSS 艺术元素
-    if (portraitClass === 'npc-courier') {
-      inner.innerHTML =
-        '<div class="npc-rain"></div>' +
-        '<div class="npc-hood"></div>' +
-        '<div class="npc-head"></div>' +
-        '<div class="npc-body"></div>';
-    } else if (portraitClass === 'npc-housewife') {
-      inner.innerHTML =
-        '<div class="npc-hair"></div>' +
-        '<div class="npc-head"></div>' +
-        '<div class="npc-eyes"><span></span><span></span></div>' +
-        '<div class="npc-body"></div>' +
-        '<div class="npc-apron"></div>';
-    } else if (portraitClass === 'npc-mercenary') {
-      inner.innerHTML =
-        '<div class="npc-head"></div>' +
-        '<div class="npc-scar"></div>' +
-        '<div class="npc-body"></div>' +
-        '<div class="npc-band"></div>';
-    } else if (portraitClass === 'npc-system') {
-      inner.innerHTML = '⚠';
+    // 使用 AI 生成的油画风格立绘图片
+    var portraitMap = {
+      'npc-courier':    'assets/img/portraits/npc_portrait_courier.png',
+      'npc-housewife':  'assets/img/portraits/npc_portrait_housewife.png',
+      'npc-mercenary':  'assets/img/portraits/npc_portrait_mercenary.png',
+      'npc-system':     'assets/img/portraits/npc_portrait_system.png'
+    };
+
+    var imgSrc = portraitMap[portraitClass];
+    if (imgSrc) {
+      var img = document.createElement('img');
+      img.src = imgSrc;
+      img.alt = portraitClass || '';
+      img.className = 'npc-portrait-img';
+      img.onerror = function() {
+        // 图片加载失败时回退到 CSS 艺术
+        this.style.display = 'none';
+        inner.classList.add('css-fallback');
+      };
+      inner.appendChild(img);
     }
   }
 

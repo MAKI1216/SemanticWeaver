@@ -38,6 +38,8 @@ var BoardSystem = (function() {
     if (callbacks.onCombineFail) onCombineFailCallback = callbacks.onCombineFail;
     if (callbacks.onSubmit) onSubmitCallback = callbacks.onSubmit;
     if (callbacks.onCardDeleted) onCardDeletedCallback = callbacks.onCardDeleted;
+    if (callbacks.onContradictionFlagged) onContradictionFlaggedCallback = callbacks.onContradictionFlagged;
+    if (callbacks.onMetaIntrusion) onMetaIntrusionCallback = callbacks.onMetaIntrusion;
   }
 
   /**
@@ -61,15 +63,22 @@ var BoardSystem = (function() {
    * @returns {Object} 卡片数据对象
    */
   function createCard(text, x, y, options) {
-    var defaults = { isGolden: false, animate: true };
+    var defaults = { isGolden: false, animate: true, cardType: null };
     var opts = Object.assign({}, defaults, options);
+
+    // 查询关键词元数据获取 card_type
+    var meta = getKeywordMetadata(text);
+    var cardType = opts.cardType || meta.card_type || 'normal';
 
     var cardData = {
       id: 'card-' + (++cardIdCounter),
       text: text,
       x: x,
       y: y,
-      isGolden: opts.isGolden
+      isGolden: opts.isGolden,
+      cardType: cardType,
+      attributes: meta.attributes.slice(),
+      metaTargets: meta.meta_targets || null  // Phase 3: Meta 关键词的入侵目标列表
     };
 
     // 检查是否为金色（匹配 required_submit）
@@ -81,19 +90,67 @@ var BoardSystem = (function() {
 
     // 创建 DOM 元素
     var el = document.createElement('div');
-    el.className = 'board-card' + (cardData.isGolden ? ' golden' : '');
+    el.className = 'board-card';
+    // 根据 card_type 应用视觉样式
+    if (cardType !== 'normal') {
+      el.classList.add('card-type-' + cardType);
+    }
+    if (cardData.isGolden) {
+      el.classList.add('golden');
+    }
     if (opts.animate) el.classList.add('card-spawn');
     el.textContent = text;
     el.dataset.cardId = cardData.id;
+    el.dataset.cardType = cardType;
     el.style.left = x + 'px';
     el.style.top = y + 'px';
+
+    // Phase 2.2: 卡片底部属性图标条
+    if (cardData.attributes.length > 0 && cardType !== 'hidden') {
+      var attrBar = document.createElement('div');
+      attrBar.className = 'card-attr-bar';
+      cardData.attributes.forEach(function(attr) {
+        var def = GAME_DATA.attribute_defs[attr];
+        if (def) {
+          var icon = document.createElement('span');
+          icon.className = 'card-attr-icon';
+          icon.textContent = def.icon;
+          icon.title = def.name;
+          icon.dataset.attr = attr;
+          attrBar.appendChild(icon);
+        }
+      });
+      el.appendChild(attrBar);
+    }
 
     // 绑定拖拽事件
     el.addEventListener('mousedown', function(e) {
       e.preventDefault();
       e.stopPropagation();
-      startCardDrag(cardData, el, e);
+      if (markingMode) {
+        toggleCardMark(cardData, el);
+      } else {
+        startCardDrag(cardData, el, e);
+      }
     });
+
+    // Phase 2.2: 右键打开属性检查面板
+    el.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      showAttributePanel(cardData, el);
+    });
+
+    // Phase 2.2: 长按（触屏）打开属性检查面板
+    var pressTimer = null;
+    el.addEventListener('touchstart', function(e) {
+      pressTimer = setTimeout(function() {
+        e.preventDefault();
+        showAttributePanel(cardData, el);
+      }, 500);
+    });
+    el.addEventListener('touchend', function() { clearTimeout(pressTimer); });
+    el.addEventListener('touchmove', function() { clearTimeout(pressTimer); });
 
     var boardEl = document.getElementById('board-cards');
     if (boardEl) {
@@ -107,6 +164,9 @@ var BoardSystem = (function() {
       }, 500);
     }
 
+    // 更新矛盾标记按钮提示
+    updateMarkButtonHint();
+
     return cardData;
   }
 
@@ -116,6 +176,9 @@ var BoardSystem = (function() {
    * @param {boolean} animate - 是否显示销毁动画
    */
   function removeCard(cardId, animate) {
+    var card = getCard(cardId);
+    var cardType = card ? card.cardType : 'normal';
+
     // 从数据中移除
     cards = cards.filter(function(c) { return c.id !== cardId; });
 
@@ -123,13 +186,50 @@ var BoardSystem = (function() {
     var el = document.querySelector('[data-card-id="' + cardId + '"]');
     if (el) {
       if (animate) {
-        el.classList.add('card-destroy');
+        // 根据 card_type 应用不同的销毁动画
+        var destroyClass = 'card-destroy';
+        if (cardType === 'distorted') {
+          destroyClass = 'card-destroy-glitch';
+        } else if (cardType === 'hidden') {
+          destroyClass = 'card-destroy-noise';
+        } else if (cardType === 'meta') {
+          destroyClass = 'card-destroy-meta';
+        }
+        el.classList.add(destroyClass);
         setTimeout(function() {
           if (el.parentNode) el.parentNode.removeChild(el);
+          updateMarkButtonHint();
         }, 400);
       } else {
         if (el.parentNode) el.parentNode.removeChild(el);
+        updateMarkButtonHint();
       }
+    }
+  }
+
+  /**
+   * 切换卡片类型（更新视觉样式 + 数据）
+   * @param {Object|string} cardOrId - 卡片数据对象或卡片 ID
+   * @param {string} newType - 新的 card_type ('normal'|'hidden'|'half_finished'|'distorted'|'meta')
+   */
+  function setCardType(cardOrId, newType) {
+    var card = (typeof cardOrId === 'string') ? getCard(cardOrId) : cardOrId;
+    if (!card) return;
+
+    var oldType = card.cardType;
+    card.cardType = newType;
+
+    var el = document.querySelector('[data-card-id="' + card.id + '"]');
+    if (el) {
+      // 移除旧类型类
+      if (oldType !== 'normal') {
+        el.classList.remove('card-type-' + oldType);
+      }
+      // 添加新类型类
+      if (newType !== 'normal') {
+        el.classList.add('card-type-' + newType);
+      }
+      el.dataset.cardType = newType;
     }
   }
 
@@ -173,6 +273,7 @@ var BoardSystem = (function() {
     if (boardEl) {
       boardEl.innerHTML = '';
     }
+    updateMarkButtonHint();
   }
 
   /**
@@ -181,6 +282,192 @@ var BoardSystem = (function() {
    */
   function getAllCards() {
     return cards.slice();
+  }
+
+  // ==================== 属性检查面板（Phase 2.2）====================
+
+  /**
+   * 显示属性检查面板
+   * @param {Object} cardData - 卡片数据
+   * @param {HTMLElement} cardEl - 卡片 DOM 元素
+   */
+  function showAttributePanel(cardData, cardEl) {
+    hideAttributePanel();
+
+    var panel = document.createElement('div');
+    panel.className = 'attr-panel';
+    panel.id = 'attr-panel';
+
+    // 卡片名称
+    var header = document.createElement('div');
+    header.className = 'attr-panel-header';
+    header.textContent = cardData.text;
+    panel.appendChild(header);
+
+    // 属性列表
+    if (cardData.attributes.length > 0) {
+      var list = document.createElement('div');
+      list.className = 'attr-panel-list';
+      cardData.attributes.forEach(function(attr) {
+        var def = GAME_DATA.attribute_defs[attr];
+        if (def) {
+          var item = document.createElement('div');
+          item.className = 'attr-panel-item';
+          item.innerHTML =
+            '<span class="attr-panel-icon">' + def.icon + '</span>' +
+            '<span class="attr-panel-name">' + def.name + '</span>';
+          list.appendChild(item);
+        }
+      });
+      panel.appendChild(list);
+    } else {
+      var empty = document.createElement('div');
+      empty.className = 'attr-panel-empty';
+      empty.textContent = '无属性标记';
+      panel.appendChild(empty);
+    }
+
+    // 检查与板上其他卡片的属性矛盾
+    var contradictions = [];
+    var allCards = getAllCards();
+    allCards.forEach(function(other) {
+      if (other.id === cardData.id) return;
+      var c = checkAttributeContradiction(cardData.attributes, other.attributes);
+      if (c) {
+        contradictions.push({ card: other.text, attrA: c.attrA, attrB: c.attrB });
+      }
+    });
+
+    if (contradictions.length > 0) {
+      var warning = document.createElement('div');
+      warning.className = 'attr-panel-warning';
+      contradictions.forEach(function(con) {
+        var line = document.createElement('div');
+        line.className = 'attr-panel-warning-line';
+        line.textContent = '\u26A0 \u4E0E\u300C' + con.card + '\u300D\u5C5E\u6027\u51B2\u7A81';
+        warning.appendChild(line);
+      });
+      panel.appendChild(warning);
+    }
+
+    // 定位面板
+    var rect = cardEl.getBoundingClientRect();
+    var panelLeft = rect.right + 10;
+    // 如果右侧空间不够，放左侧
+    if (panelLeft + 220 > window.innerWidth) {
+      panelLeft = rect.left - 230;
+    }
+    panel.style.left = Math.max(10, panelLeft) + 'px';
+    panel.style.top = Math.max(10, rect.top) + 'px';
+
+    document.body.appendChild(panel);
+
+    // 点击面板外关闭
+    setTimeout(function() {
+      document.addEventListener('click', hideAttributePanel, { once: true });
+      document.addEventListener('contextmenu', hideAttributePanel, { once: true });
+    }, 10);
+  }
+
+  /**
+   * 隐藏属性检查面板
+   */
+  function hideAttributePanel() {
+    var panel = document.getElementById('attr-panel');
+    if (panel && panel.parentNode) {
+      panel.parentNode.removeChild(panel);
+    }
+  }
+
+  // ==================== 推演板重置 ====================
+
+  // 重置台词池
+  var resetFlavorTexts = [
+    '你深吸一口气，把推演板上的线索重新理了一遍。',
+    '你揉了揉太阳穴，决定从头梳理。',
+    '你把散落的卡片收回手中。'
+  ];
+
+  /**
+   * 初始化推演板重置按钮事件
+   */
+  function initResetButton() {
+    var btn = document.getElementById('board-reset-btn');
+    if (!btn) return;
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = 'true';
+
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      showResetConfirm();
+    });
+  }
+
+  /**
+   * 显示重置确认弹窗（非阻断式）
+   */
+  function showResetConfirm() {
+    // 如果板上没有卡片，无需重置
+    if (cards.length === 0) {
+      Renderer.showMessage('推演板已经是空的', 'game-message');
+      return;
+    }
+
+    // 创建确认弹窗
+    var overlay = document.createElement('div');
+    overlay.className = 'reset-confirm-overlay';
+    overlay.innerHTML =
+      '<div class="reset-confirm-dialog">' +
+        '<p class="reset-confirm-text">重新梳理推演板？已提取的关键词会保留。</p>' +
+        '<div class="reset-confirm-buttons">' +
+          '<button class="reset-btn-confirm">确认重置</button>' +
+          '<button class="reset-btn-cancel">再想想</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    // 确认按钮
+    overlay.querySelector('.reset-btn-confirm').addEventListener('click', function() {
+      document.body.removeChild(overlay);
+      performReset();
+    });
+
+    // 取消按钮
+    overlay.querySelector('.reset-btn-cancel').addEventListener('click', function() {
+      document.body.removeChild(overlay);
+    });
+  }
+
+  /**
+   * 执行推演板重置：清空卡片，保留叙事进度
+   */
+  function performReset() {
+    // 所有卡片溶解动画
+    var allCards = cards.slice();
+    allCards.forEach(function(card) {
+      var el = document.querySelector('[data-card-id="' + card.id + '"]');
+      if (el) {
+        el.classList.add('card-destroy');
+      }
+    });
+
+    // 延迟清空数据
+    setTimeout(function() {
+      cards = [];
+      var boardEl = document.getElementById('board-cards');
+      if (boardEl) {
+        boardEl.innerHTML = '';
+      }
+      updateMarkButtonHint();
+    }, 400);
+
+    // 显示 NPC 台词包装
+    var flavorText = resetFlavorTexts[Math.floor(Math.random() * resetFlavorTexts.length)];
+    Renderer.showMessage(flavorText, 'game-message');
+
+    // 播放音效
+    AudioManager.playDrop();
   }
 
   // ==================== 拖拽系统 ====================
@@ -192,6 +479,13 @@ var BoardSystem = (function() {
    * @param {HTMLElement} sourceEl - 来源 DOM 元素
    */
   function startKeywordDrag(keywordText, e, sourceEl) {
+    // Phase 3: 已消耗的 Meta 关键词不可再提取
+    var meta = getKeywordMetadata(keywordText);
+    if (meta.meta_consumed || !meta.is_extractable) {
+      Renderer.showMessage('这个关键词已消耗', 'game-message');
+      return;
+    }
+
     dragState.active = true;
     dragState.source = 'keyword';
     dragState.sourceData = { text: keywordText, element: sourceEl };
@@ -227,8 +521,8 @@ var BoardSystem = (function() {
     // 标记卡片为拖拽中
     el.classList.add('dragging');
 
-    // 创建幽灵元素
-    createGhost(cardData.text, cardData.isGolden, e.clientX, e.clientY);
+    // 创建幽灵元素（Phase 3: Meta 卡片使用金色幽灵）
+    createGhost(cardData.text, cardData.isGolden || cardData.cardType === 'meta', e.clientX, e.clientY);
 
     // 隐藏原始卡片（半透明）
     el.style.opacity = '0.3';
@@ -380,6 +674,43 @@ var BoardSystem = (function() {
         trashZone.classList.remove('active');
       }
     }
+
+    // Phase 3: Meta 卡片拖放高亮入侵目标
+    clearMetaDropHighlights();
+    if (dragState.source === 'card' && dragState.sourceData &&
+        dragState.sourceData.cardType === 'meta' && dragState.sourceData.metaTargets) {
+      dragState.sourceData.metaTargets.forEach(function(target) {
+        if (target === 'dialogue') {
+          var dialogueArea = document.getElementById('dialogue-area');
+          if (dialogueArea) {
+            var dRect = dialogueArea.getBoundingClientRect();
+            if (x >= dRect.left && x <= dRect.right &&
+                y >= dRect.top && y <= dRect.bottom) {
+              dialogueArea.classList.add('meta-drop-target');
+            }
+          }
+        }
+        if (target === 'crt') {
+          var crtOverlay = document.getElementById('crt-overlay');
+          if (crtOverlay) {
+            var cRect = crtOverlay.getBoundingClientRect();
+            if (x >= cRect.left && x <= cRect.right &&
+                y >= cRect.top && y <= cRect.bottom) {
+              crtOverlay.classList.add('meta-drop-target');
+            }
+          }
+        }
+      });
+    }
+  }
+
+  /**
+   * 清除 Meta 拖放高亮
+   */
+  function clearMetaDropHighlights() {
+    document.querySelectorAll('.meta-drop-target').forEach(function(el) {
+      el.classList.remove('meta-drop-target');
+    });
   }
 
   /**
@@ -389,6 +720,34 @@ var BoardSystem = (function() {
    * @returns {Object} 放置结果 {type: 'board'|'card'|'submit'|'special-target'|'trash'|'none', data: ...}
    */
   function detectDropTarget(x, y) {
+    // Phase 3: Meta 卡片入侵目标检测（优先级最高）
+    if (dragState.source === 'card' && dragState.sourceData &&
+        dragState.sourceData.cardType === 'meta' && dragState.sourceData.metaTargets) {
+      for (var i = 0; i < dragState.sourceData.metaTargets.length; i++) {
+        var target = dragState.sourceData.metaTargets[i];
+        if (target === 'dialogue') {
+          var dialogueArea = document.getElementById('dialogue-area');
+          if (dialogueArea) {
+            var dRect = dialogueArea.getBoundingClientRect();
+            if (x >= dRect.left && x <= dRect.right &&
+                y >= dRect.top && y <= dRect.bottom) {
+              return { type: 'meta-dialogue', data: null };
+            }
+          }
+        }
+        if (target === 'crt') {
+          var crtOverlay = document.getElementById('crt-overlay');
+          if (crtOverlay) {
+            var cRect = crtOverlay.getBoundingClientRect();
+            if (x >= cRect.left && x <= cRect.right &&
+                y >= cRect.top && y <= cRect.bottom) {
+              return { type: 'meta-crt', data: null };
+            }
+          }
+        }
+      }
+    }
+
     // 检查提交区域
     if (dragState.source === 'card' && dragState.sourceData && dragState.sourceData.isGolden) {
       var submitZone = document.getElementById('submit-zone');
@@ -491,6 +850,16 @@ var BoardSystem = (function() {
     var boardRect = boardEl ? boardEl.getBoundingClientRect() : null;
 
     switch (dropResult.type) {
+      case 'meta-dialogue':
+        // Phase 3: Meta 关键词入侵对话框
+        handleMetaIntrusion('dialogue', e);
+        break;
+
+      case 'meta-crt':
+        // Phase 3: Meta 关键词入侵 CRT 区域
+        handleMetaIntrusion('crt', e);
+        break;
+
       case 'board':
         // 从关键词拖放到板上：创建新卡片
         if (dragState.source === 'keyword') {
@@ -500,8 +869,16 @@ var BoardSystem = (function() {
           relX = Math.max(10, Math.min(relX, boardRect.width - 120));
           relY = Math.max(10, Math.min(relY, boardRect.height - 50));
           createCard(dragState.sourceData.text, relX, relY);
+          // Phase 1.3: 检查提取次数，重复提取时音效更轻
+          var extractCount = DialogueSystem.getExtractCount(dragState.sourceData.text);
           DialogueSystem.markKeywordExtracted(dragState.sourceData.text);
-          AudioManager.playDrop();
+          if (extractCount > 0) {
+            // 重复提取：播放更轻的音效
+            AudioManager.playDropLight();
+          } else {
+            // 首次提取：正常音效
+            AudioManager.playDrop();
+          }
         }
         // 从技能卡拖放到板空白区域：不创建卡片（技能卡不消耗）
         if (dragState.source === 'skill') {
@@ -559,6 +936,117 @@ var BoardSystem = (function() {
     }
   }
 
+  // ==================== Phase 3: Meta 入侵 ====================
+
+  var onMetaIntrusionCallback = null; // Meta 入侵回调
+
+  /**
+   * 处理 Meta 入侵
+   * @param {string} targetType - 'dialogue' | 'crt'
+   * @param {MouseEvent} e - 鼠标事件
+   */
+  function handleMetaIntrusion(targetType, e) {
+    var cardData = dragState.sourceData;
+    if (!cardData || cardData.cardType !== 'meta') return;
+
+    if (targetType === 'dialogue') {
+      // 对话框入侵：检查是否有隐藏台词层
+      if (!DialogueSystem.hasHiddenLayer()) {
+        // 无隐藏台词层，入侵失败，卡片不消耗
+        Renderer.showMessage('这段对话下面什么也没有……', 'game-message');
+        return;
+      }
+
+      // 检查门控条件
+      var gate = DialogueSystem.getCurrentHiddenLayerGate();
+      if (gate) {
+        // 需要检查矛盾标记是否已完成
+        var save = Game.loadGame ? null : null; // 通过回调检查
+        if (onMetaIntrusionCallback) {
+          var allowed = onMetaIntrusionCallback('check_gate', gate);
+          if (!allowed) {
+            Renderer.showMessage('底层记录被加密了……需要先找到矛盾线索。', 'combine-error');
+            return;
+          }
+        }
+      }
+
+      // 入侵成功！消耗 Meta 卡片
+      consumeMetaCard(cardData);
+
+      // 触发对话框 glitch 效果
+      var dialogueArea = document.getElementById('dialogue-area');
+      if (dialogueArea) {
+        dialogueArea.classList.add('glitch-burst');
+        setTimeout(function() {
+          dialogueArea.classList.remove('glitch-burst');
+        }, 500);
+      }
+
+      // 揭示隐藏台词层
+      setTimeout(function() {
+        DialogueSystem.revealHiddenLayer();
+        Renderer.showFlash('green', 400);
+        AudioManager.playSuccess();
+        Renderer.showMessage('Meta 入侵成功！底层记录已浮现', 'game-message');
+
+        // 记录 Meta 入侵到存档
+        if (onMetaIntrusionCallback) {
+          onMetaIntrusionCallback('performed', {
+            trial: Game.state ? Game.state.currentTrial : null,
+            keyword: cardData.text,
+            target: 'dialogue'
+          });
+        }
+      }, 300);
+
+    } else if (targetType === 'crt') {
+      // CRT 入侵：强化故障效果
+      consumeMetaCard(cardData);
+
+      document.body.classList.add('glitch-burst');
+      Renderer.showFlash('green', 500);
+      AudioManager.playGlitch();
+
+      setTimeout(function() {
+        document.body.classList.remove('glitch-burst');
+        Renderer.showMessage('CRT 扫描线背后似乎有什么……', 'game-message');
+      }, 1000);
+
+      if (onMetaIntrusionCallback) {
+        onMetaIntrusionCallback('performed', {
+          trial: Game.state ? Game.state.currentTrial : null,
+          keyword: cardData.text,
+          target: 'crt'
+        });
+      }
+    }
+  }
+
+  /**
+   * 消耗 Meta 卡片（从板上移除 + 标记关键词不可再提取）
+   * @param {Object} cardData - 被消耗的卡片数据
+   */
+  function consumeMetaCard(cardData) {
+    // 从板上移除卡片
+    removeCard(cardData.id, true);
+
+    // 标记关键词为已消耗（不可再提取）
+    if (GAME_DATA.keyword_metadata[cardData.text]) {
+      GAME_DATA.keyword_metadata[cardData.text].is_extractable = false;
+      GAME_DATA.keyword_metadata[cardData.text].meta_consumed = true;
+    }
+
+    // 在对话中标记该关键词为已消耗
+    var keywords = document.querySelectorAll('#dialogue-area .keyword');
+    keywords.forEach(function(kw) {
+      if (kw.dataset.keyword === cardData.text) {
+        kw.classList.add('meta-consumed');
+        kw.dataset.bound = 'true'; // 防止再次绑定
+      }
+    });
+  }
+
   /**
    * 处理卡片合成
    * @param {Object} targetCard - 目标卡片数据
@@ -571,6 +1059,11 @@ var BoardSystem = (function() {
     if (dragState.source === 'card') {
       textA = dragState.sourceData.text;
       textB = targetCard.text;
+      // Phase 3: Meta 卡片不参与合成
+      if (dragState.sourceData.cardType === 'meta' || targetCard.cardType === 'meta') {
+        Renderer.showMessage('Meta 关键词只能用于入侵 UI', 'game-message');
+        return;
+      }
     } else if (dragState.source === 'skill') {
       textA = dragState.sourceData.text;
       textB = targetCard.text;
@@ -579,15 +1072,65 @@ var BoardSystem = (function() {
       return;
     }
 
+    var boardEl = document.getElementById('board-cards');
+    var boardRect = boardEl.getBoundingClientRect();
+    var resultX = e.clientX - boardRect.left - 40;
+    var resultY = e.clientY - boardRect.top - 15;
+
+    // Phase 2.5: 技能卡 + 失真卡 → 净化
+    if (isSkillCombine && targetCard.cardType === 'distorted') {
+      var isSkillSensory = (textA === '视觉重构' || textA === '听觉重构' || textA === '嗅觉重构');
+      if (isSkillSensory) {
+        removeCard(targetCard.id, true);
+        setTimeout(function() {
+          var purifiedCard = createCard(textB, resultX, resultY, { animate: true, cardType: 'normal' });
+          Renderer.showCombineSuccess(e.clientX, e.clientY);
+          Renderer.showMessage('\u5931\u771F\u5F97\u5230\u51C0\u5316\uFF01', 'game-message');
+          AudioManager.playSuccess();
+        }, 300);
+        return;
+      }
+    }
+
+    // Phase 2.5: 两张失真卡 → 概率校准（50%成功净化为 normal，50%双倍失真）
+    if (dragState.source === 'card' &&
+        dragState.sourceData.cardType === 'distorted' &&
+        targetCard.cardType === 'distorted') {
+      removeCard(dragState.sourceData.id, true);
+      removeCard(targetCard.id, true);
+
+      var success = (Math.random() < 0.5);
+      setTimeout(function() {
+        if (success) {
+          // 50%: 净化，产出 normal 卡
+          var result50 = Game.findRecipe(textA, textB) || textA;
+          createCard(result50, resultX, resultY, { animate: true, cardType: 'normal' });
+          Renderer.showCombineSuccess(e.clientX, e.clientY);
+          Renderer.showMessage('\u6982\u7387\u6821\u51C6\u6210\u529F\uFF01\u5931\u771F\u88AB\u4FEE\u6B63', 'game-message');
+        } else {
+          // 50%: 失败，产出一张更强失真卡（保留文本）
+          createCard(textA, resultX, resultY, { animate: true, cardType: 'distorted' });
+          Renderer.showFlash('red', 300);
+          AudioManager.playFail();
+          Renderer.showMessage('\u6982\u7387\u6821\u51C6\u5931\u8D25\uFF01\u5931\u771F\u52A0\u5267', 'combine-error');
+        }
+        checkDistortedOverload();
+      }, 300);
+      return;
+    }
+
     // 查找配方
     var result = Game.findRecipe(textA, textB);
 
     if (result) {
-      // 合成成功！
-      var boardEl = document.getElementById('board-cards');
-      var boardRect = boardEl.getBoundingClientRect();
-      var resultX = e.clientX - boardRect.left - 40;
-      var resultY = e.clientY - boardRect.top - 15;
+      // Phase 2.3: 属性兼容性检查（仅对卡片+卡片合成，技能卡不检查）
+      var isDistorted = false;
+      if (dragState.source === 'card') {
+        var metaA = getKeywordMetadata(textA);
+        var metaB = getKeywordMetadata(textB);
+        var contradiction = checkAttributeContradiction(metaA.attributes, metaB.attributes);
+        isDistorted = !!contradiction;
+      }
 
       // 移除被消耗的卡片（技能卡不消耗）
       if (dragState.source === 'card') {
@@ -597,11 +1140,23 @@ var BoardSystem = (function() {
 
       // 创建结果卡片
       setTimeout(function() {
-        createCard(result, resultX, resultY, { animate: true });
+        if (isDistorted) {
+          // 属性矛盾：产出失真卡
+          createCard(result, resultX, resultY, { animate: true, cardType: 'distorted' });
+          Renderer.showMessage('\u5C5E\u6027\u51B2\u7A81\uFF01\u5408\u6210\u7ED3\u679C\u53D1\u751F\u5931\u771F', 'combine-error');
+          checkDistortedOverload();
+        } else {
+          createCard(result, resultX, resultY, { animate: true });
+        }
       }, 300);
 
       // 特效
-      Renderer.showCombineSuccess(e.clientX, e.clientY);
+      if (isDistorted) {
+        Renderer.showFlash('red', 300);
+        AudioManager.playFail();
+      } else {
+        Renderer.showCombineSuccess(e.clientX, e.clientY);
+      }
 
       // 回调
       if (onCombineCallback) {
@@ -629,7 +1184,7 @@ var BoardSystem = (function() {
       Renderer.showCombineFail(e.clientX, e.clientY);
 
       // 提示
-      Renderer.showMessage('缺乏逻辑关联', 'combine-error');
+      Renderer.showMessage('\u7F3A\u4E4F\u903B\u8F91\u5173\u8054', 'combine-error');
 
       // 回调
       if (onCombineFailCallback) {
@@ -670,6 +1225,9 @@ var BoardSystem = (function() {
     var trashZone = document.getElementById('trash-zone');
     if (trashZone) trashZone.classList.remove('active');
 
+    // Phase 3: 清除 Meta 拖放高亮
+    clearMetaDropHighlights();
+
     // 重置状态
     dragState.active = false;
     dragState.source = null;
@@ -693,6 +1251,230 @@ var BoardSystem = (function() {
         startSkillDrag(skillName, e, card);
       });
     });
+  }
+
+  // ==================== 矛盾标记系统（Phase 2.4）====================
+
+  var markingMode = false;         // 是否处于标记模式
+  var markedCards = [];            // 当前选中的卡片 [{data, el}]
+  var flaggedContradictions = [];  // 已标记的矛盾 ID 列表
+  var onContradictionFlaggedCallback = null; // 矛盾标记成功回调
+
+  /**
+   * 更新矛盾标记按钮的提示状态
+   * 板上有 2+ 张卡片时，按钮微微发光提示玩家可以使用
+   */
+  function updateMarkButtonHint() {
+    var btn = document.getElementById('mark-contradiction-btn');
+    if (!btn) return;
+    if (markingMode) return; // 标记模式下不更新
+    if (cards.length >= 2) {
+      btn.classList.add('hint-available');
+    } else {
+      btn.classList.remove('hint-available');
+    }
+  }
+
+  /**
+   * 初始化矛盾标记按钮
+   */
+  function initMarkContradictionButton() {
+    var btn = document.getElementById('mark-contradiction-btn');
+    if (!btn) return;
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = 'true';
+
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (markingMode) {
+        exitMarkingMode();
+      } else {
+        enterMarkingMode();
+      }
+    });
+  }
+
+  /**
+   * 进入标记模式
+   */
+  function enterMarkingMode() {
+    markingMode = true;
+    markedCards = [];
+
+    var btn = document.getElementById('mark-contradiction-btn');
+    if (btn) {
+      btn.classList.add('active');
+      btn.classList.remove('hint-available');
+    }
+
+    // 推演板添加标记模式样式
+    var boardEl = document.getElementById('board-cards');
+    if (boardEl) boardEl.classList.add('marking-mode');
+
+    Renderer.showMessage('\u26A1 \u6807\u8BB0\u6A21\u5F0F\u5DF2\u5F00\u542F\uFF1A\u70B9\u51FB\u4E24\u5F20\u5361\u7247\u6765\u6807\u8BB0\u5B83\u4EEC\u4E4B\u95F4\u7684\u77DB\u76FE\uFF08\u518D\u70B9\u4E00\u6B21\u53D6\u6D88\u9009\u4E2D\uFF09', 'game-message');
+  }
+
+  /**
+   * 退出标记模式
+   */
+  function exitMarkingMode() {
+    markingMode = false;
+
+    // 取消所有选中
+    markedCards.forEach(function(item) {
+      item.el.classList.remove('mark-selected');
+    });
+    markedCards = [];
+
+    var btn = document.getElementById('mark-contradiction-btn');
+    if (btn) btn.classList.remove('active');
+
+    var boardEl = document.getElementById('board-cards');
+    if (boardEl) boardEl.classList.remove('marking-mode');
+
+    // 恢复按钮提示状态
+    updateMarkButtonHint();
+  }
+
+  /**
+   * 切换卡片选中状态（标记模式下）
+   * @param {Object} cardData - 卡片数据
+   * @param {HTMLElement} el - 卡片 DOM 元素
+   */
+  function toggleCardMark(cardData, el) {
+    // 检查是否已选中
+    var existingIdx = -1;
+    for (var i = 0; i < markedCards.length; i++) {
+      if (markedCards[i].data.id === cardData.id) {
+        existingIdx = i;
+        break;
+      }
+    }
+
+    if (existingIdx >= 0) {
+      // 取消选中
+      el.classList.remove('mark-selected');
+      markedCards.splice(existingIdx, 1);
+    } else {
+      // 选中（最多2张）
+      if (markedCards.length >= 2) {
+        // 移除最早选中的
+        markedCards[0].el.classList.remove('mark-selected');
+        markedCards.shift();
+      }
+      el.classList.add('mark-selected');
+      markedCards.push({ data: cardData, el: el });
+
+      // 选中2张时自动检查矛盾
+      if (markedCards.length === 2) {
+        setTimeout(executeMarkContradiction, 200);
+      }
+    }
+  }
+
+  /**
+   * 执行矛盾标记检查
+   */
+  function executeMarkContradiction() {
+    if (markedCards.length !== 2) return;
+
+    var cardA = markedCards[0].data;
+    var cardB = markedCards[1].data;
+    var elA = markedCards[0].el;
+    var elB = markedCards[1].el;
+
+    // 查找语义矛盾
+    var contradiction = findSemanticContradiction(cardA.text, cardB.text);
+
+    // 同时也检查属性矛盾
+    var attrConflict = checkAttributeContradiction(cardA.attributes, cardB.attributes);
+
+    if (contradiction) {
+      // 检查是否已标记过
+      if (flaggedContradictions.indexOf(contradiction.id) >= 0) {
+        Renderer.showMessage('\u8FD9\u4E2A\u77DB\u76FE\u5DF2\u7ECF\u88AB\u6807\u8BB0\u8FC7\u4E86', 'game-message');
+        exitMarkingMode();
+        return;
+      }
+
+      // 标记成功！
+      flaggedContradictions.push(contradiction.id);
+
+      // 解锁隐藏关键词
+      if (contradiction.unlocks && contradiction.unlocks.length > 0) {
+        unlockContradictionKeywords(contradiction.unlocks);
+      }
+
+      // 特效
+      Renderer.showFlash('red', 400);
+      AudioManager.playSuccess();
+      Renderer.showMessage('\u77DB\u76FE\u6807\u8BB0\u6210\u529F\uFF01\u65B0\u7684\u7EBF\u7D22\u88AB\u89E3\u9501', 'game-message');
+
+      // 回调通知 game.js 记录
+      if (onContradictionFlaggedCallback) {
+        onContradictionFlaggedCallback(contradiction.id, contradiction.trial);
+      }
+
+      exitMarkingMode();
+    } else if (attrConflict) {
+      // 属性矛盾（但非语义矛盾标记点）
+      Renderer.showMessage('\u8FD9\u4E24\u5F20\u5361\u7247\u5C5E\u6027\u51B2\u7A81\uFF0C\u4F46\u672A\u53D1\u73B0\u8BB0\u5FC6\u77DB\u76FE', 'game-message');
+      exitMarkingMode();
+    } else {
+      // 无矛盾
+      Renderer.showMessage('\u8FD9\u4E24\u5F20\u5361\u7247\u4E4B\u95F4\u672A\u53D1\u73B0\u77DB\u76FE', 'game-message');
+      exitMarkingMode();
+    }
+  }
+
+  /**
+   * 解锁矛盾对应的隐藏关键词
+   * @param {Array} unlocks - 解锁列表 [{stage, word, was_noise}]
+   */
+  function unlockContradictionKeywords(unlocks) {
+    unlocks.forEach(function(item) {
+      var word = item.word;
+      // 将关键词的 is_extractable 设为 true（运行时修改 metadata）
+      if (GAME_DATA.keyword_metadata[word]) {
+        GAME_DATA.keyword_metadata[word].is_extractable = true;
+        GAME_DATA.keyword_metadata[word].card_type = 'normal';
+      }
+      // 在对话中追加解锁的关键词
+      DialogueSystem.appendUnlockedKeyword(word);
+    });
+  }
+
+  /**
+   * 获取推演板上失真卡数量（Phase 2.5 使用）
+   * @returns {number}
+   */
+  function getDistortedCount() {
+    var count = 0;
+    cards.forEach(function(card) {
+      if (card.cardType === 'distorted') count++;
+    });
+    return count;
+  }
+
+  /**
+   * Phase 2.5: 检查失真卡过载状态（超3张时发出警告）
+   */
+  function checkDistortedOverload() {
+    var count = getDistortedCount();
+    var boardEl = document.getElementById('board-cards');
+    if (!boardEl) return;
+
+    if (count >= 3) {
+      boardEl.classList.add('distorted-overload');
+      Renderer.showMessage(
+        '\u8B66\u544A\uFF1A\u63A8\u6F14\u677F\u5931\u771F\u8FC7\u8F7D\uFF01\uFF08' + count + '/3\uFF09\u8BF7\u4F7F\u7528\u611F\u5B98\u6280\u80FD\u5236\u5361\u6216\u91CD\u7F6E\u63A8\u6F14\u677F',
+        'combine-error'
+      );
+      Renderer.showFlash('red', 500);
+    } else {
+      boardEl.classList.remove('distorted-overload');
+    }
   }
 
   // ==================== 全局鼠标事件 ====================
@@ -748,6 +1530,7 @@ var BoardSystem = (function() {
     setRequiredSubmit: setRequiredSubmit,
     createCard: createCard,
     removeCard: removeCard,
+    setCardType: setCardType,
     getCard: getCard,
     updateCardPosition: updateCardPosition,
     clearBoard: clearBoard,
@@ -755,6 +1538,26 @@ var BoardSystem = (function() {
     startKeywordDrag: startKeywordDrag,
     autoLayout: autoLayout,
     initSkillCards: initSkillCards,
-    initGlobalListeners: initGlobalListeners
+    initGlobalListeners: initGlobalListeners,
+    initResetButton: initResetButton,
+    showAttributePanel: showAttributePanel,
+    hideAttributePanel: hideAttributePanel,
+    initMarkContradictionButton: initMarkContradictionButton,
+    getDistortedCount: getDistortedCount,
+    enterMarkingMode: enterMarkingMode,
+    exitMarkingMode: exitMarkingMode,
+    returnCardToBoard: function(text) {
+      // 退回卡片到推演板（结论取消时使用）
+      var boardEl = document.getElementById('board-cards');
+      var x = 40, y = 40;
+      if (boardEl) {
+        var existing = getAllCards();
+        if (existing.length > 0) {
+          x = 40 + (existing.length % 4) * 180;
+          y = 40 + Math.floor(existing.length / 4) * 70;
+        }
+      }
+      return createCard(text, x, y, { isGolden: true, animate: true });
+    }
   };
 })();

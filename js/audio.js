@@ -182,6 +182,27 @@ var AudioManager = (function() {
   }
 
   /**
+   * 播放重复提取音效（更轻更短）
+   * Phase 1.3: 同一关键词重复提取时使用
+   */
+  function playDropLight() {
+    if (!ctx) return;
+    resume();
+    var now = ctx.currentTime;
+
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 330;
+    gain.gain.setValueAtTime(0.02, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 0.06);
+  }
+
+  /**
    * 播放提交成功音效 - 华丽的上升音阶
    */
   function playSubmit() {
@@ -273,12 +294,15 @@ var AudioManager = (function() {
   return {
     init: init,
     resume: resume,
+    mute: function() { if (masterGain) masterGain.gain.value = 0; },
+    unmute: function() { if (masterGain) masterGain.gain.value = 0.3; },
     playSuccess: playSuccess,
     playFail: playFail,
     playType: playType,
     playWarning: playWarning,
     playGlitch: playGlitch,
     playDrop: playDrop,
+    playDropLight: playDropLight,
     playSubmit: playSubmit,
     playCountdownTick: playCountdownTick,
     playEnding: playEnding
