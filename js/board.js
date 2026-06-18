@@ -506,7 +506,7 @@ var BoardSystem = (function() {
     Renderer.showMessage(flavorText, 'game-message');
 
     // 播放音效
-    AudioManager.playDrop();
+    AudioManager.playBoardReset();
   }
 
   // ==================== 拖拽系统 ====================
@@ -913,11 +913,9 @@ var BoardSystem = (function() {
           var extractCount = DialogueSystem.getExtractCount(dragState.sourceData.text);
           DialogueSystem.markKeywordExtracted(dragState.sourceData.text);
           if (extractCount > 0) {
-            // 重复提取：播放更轻的音效
-            AudioManager.playDropLight();
+            AudioManager.playKeywordPickup('repeat');
           } else {
-            // 首次提取：正常音效
-            AudioManager.playDrop();
+            AudioManager.playKeywordPickup('fresh');
           }
         }
         // 从技能卡拖放到板空白区域：不创建卡片（技能卡不消耗）
@@ -943,7 +941,16 @@ var BoardSystem = (function() {
         break;
 
       case 'submit':
-        // 提交金色卡片
+        // 提交金色卡片 — 失真卡未净化不可提交
+        if (dragState.sourceData.cardType === 'distorted') {
+          Renderer.showMessage('这张卡片已经失真，必须先使用技能卡净化后再提交', 'combine-error');
+          // 卡片返回原位
+          if (dragState.originalCard) {
+            dragState.originalCard.style.opacity = '1';
+            dragState.originalCard.classList.remove('dragging');
+          }
+          return;
+        }
         if (onSubmitCallback) {
           onSubmitCallback(dragState.sourceData.text, false);
         }
@@ -951,7 +958,15 @@ var BoardSystem = (function() {
         break;
 
       case 'special-target':
-        // 提交到特殊目标（Trial 4）
+        // 提交到特殊目标（Trial 4）— 失真卡未净化不可提交
+        if (dragState.sourceData.cardType === 'distorted') {
+          Renderer.showMessage('这张卡片已经失真，必须先使用技能卡净化后再提交', 'combine-error');
+          if (dragState.originalCard) {
+            dragState.originalCard.style.opacity = '1';
+            dragState.originalCard.classList.remove('dragging');
+          }
+          return;
+        }
         if (onSubmitCallback) {
           onSubmitCallback(dragState.sourceData.text, true);
         }
@@ -963,7 +978,7 @@ var BoardSystem = (function() {
         if (dragState.source === 'card') {
           var wasGolden = dragState.sourceData.isGolden;
           removeCard(dragState.sourceData.id, true);
-          AudioManager.playDrop();
+          AudioManager.playTrash(wasGolden);
           if (onCardDeletedCallback) {
             onCardDeletedCallback(dragState.sourceData.id, wasGolden);
           }
@@ -1027,7 +1042,7 @@ var BoardSystem = (function() {
       setTimeout(function() {
         DialogueSystem.revealHiddenLayer();
         Renderer.showFlash('green', 400);
-        AudioManager.playSuccess();
+        AudioManager.playMetaIntrusion('dialogue');
         Renderer.showMessage('Meta 入侵成功！底层记录已浮现', 'game-message');
 
         // 记录 Meta 入侵到存档
@@ -1046,7 +1061,7 @@ var BoardSystem = (function() {
 
       document.body.classList.add('glitch-burst');
       Renderer.showFlash('green', 500);
-      AudioManager.playGlitch();
+      AudioManager.playMetaIntrusion('crt');
 
       setTimeout(function() {
         document.body.classList.remove('glitch-burst');
@@ -1448,7 +1463,7 @@ var BoardSystem = (function() {
 
       // 特效
       Renderer.showFlash('red', 400);
-      AudioManager.playSuccess();
+      AudioManager.playContradictionMark();
       Renderer.showMessage('\u77DB\u76FE\u6807\u8BB0\u6210\u529F\uFF01\u65B0\u7684\u7EBF\u7D22\u88AB\u89E3\u9501', 'game-message');
 
       // 回调通知 game.js 记录

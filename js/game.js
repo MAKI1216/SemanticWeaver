@@ -935,9 +935,16 @@ var Game = (function() {
         state.theme = 'interrogation';
         Renderer.showSpecialTarget(true);
         Renderer.startGlitch();
+        AudioManager.stopClinicAmbience();
+        AudioManager.playInterrogationAmbience();
         AudioManager.playWarning();
       } else {
         Renderer.showSubmitZone(true);
+        AudioManager.stopInterrogationAmbience();
+        AudioManager.stopCountdownMusic();
+        AudioManager.stopHeartbeatLoop();
+        AudioManager.stopAlarmLoop();
+        AudioManager.playClinicAmbience();
       }
 
       DialogueSystem.clearDialogue();
@@ -1162,6 +1169,7 @@ var Game = (function() {
    */
   function advanceStage(nextStageId) {
     if (nextStageId) {
+      AudioManager.playStageTransition();
       setTimeout(function() {
         runStage(state.currentTrial, nextStageId);
       }, 800);
@@ -1408,9 +1416,46 @@ var Game = (function() {
     if (!GAME_DATA.trials.trial_4 || !GAME_DATA.trials.trial_4.special) return;
 
     var specialConfig = GAME_DATA.trials.trial_4.special;
-    state.countdownRemaining = specialConfig.countdown_seconds || 180;
+    state.countdownRemaining = specialConfig.countdown_seconds || 60;
 
     stopCountdown();
+
+    // 启动倒计时分层音乐 (Tier 1)
+    AudioManager.startCountdownMusic();
+    // 启动心跳 loop (初始 2s 间隔)
+    AudioManager.startHeartbeatLoop(2.0);
+
+    // 电影级低频冲击间歇触发（降低频率避免密集）
+    var industrialInterval = setInterval(function() {
+      if (state.gameOver || state.countdownRemaining <= 0) {
+        clearInterval(industrialInterval);
+        return;
+      }
+      var prob = state.countdownRemaining <= 15 ? 0.35 : 0.15;
+      if (Math.random() < prob) AudioManager.playIndustrialNoise();
+    }, 5000);
+    // 存储以在 stopCountdown 中清理
+    state._industrialInterval = industrialInterval;
+
+    // 弦乐紧张 swell（30->15s，降低频率）
+    var alarmInterval = setInterval(function() {
+      if (state.gameOver || state.countdownRemaining <= 0 || state.countdownRemaining > 30) {
+        return;
+      }
+      if (state.countdownRemaining <= 15) return; // 15s 以下用长鸣
+      AudioManager.playAlarmBurst();
+    }, 6000);
+    state._alarmInterval = alarmInterval;
+
+    // 数据损坏随机触发（15->0s，大幅降低频率和概率）
+    var corruptionInterval = setInterval(function() {
+      if (state.gameOver || state.countdownRemaining <= 0 || state.countdownRemaining > 15) {
+        return;
+      }
+      var prob = Math.min(0.5, (15 - state.countdownRemaining) / 15 * 0.4 + 0.1);
+      if (Math.random() < prob) AudioManager.playDataCorruption();
+    }, 2000);
+    state._corruptionInterval = corruptionInterval;
 
     state.countdownTimer = setInterval(function() {
       if (state.gameOver) {
@@ -1425,7 +1470,21 @@ var Game = (function() {
       Renderer.updateCountdownDisplay(state.countdownRemaining, total);
       Renderer.updateHUD({ progress: 100 - percent });
 
-      // 最后30秒倒计时音效
+      // === 倒计时音乐分层切换 ===
+      if (state.countdownRemaining === 30) {
+        AudioManager.updateCountdownMusicTier(2);
+        AudioManager.updateHeartbeatRate(1.3);
+      }
+      if (state.countdownRemaining === 15) {
+        AudioManager.updateCountdownMusicTier(3);
+        AudioManager.updateHeartbeatRate(0.8);
+        AudioManager.startAlarmLoop();
+      }
+      if (state.countdownRemaining === 5) {
+        AudioManager.updateHeartbeatRate(0.5);
+      }
+
+      // 最后30秒倒计时滴答
       if (state.countdownRemaining <= 30 && state.countdownRemaining > 0) {
         AudioManager.playCountdownTick();
       }
@@ -1446,6 +1505,13 @@ var Game = (function() {
       clearInterval(state.countdownTimer);
       state.countdownTimer = null;
     }
+    // 清理音效定时器
+    if (state._industrialInterval) { clearInterval(state._industrialInterval); state._industrialInterval = null; }
+    if (state._alarmInterval) { clearInterval(state._alarmInterval); state._alarmInterval = null; }
+    if (state._corruptionInterval) { clearInterval(state._corruptionInterval); state._corruptionInterval = null; }
+    AudioManager.stopCountdownMusic();
+    AudioManager.stopHeartbeatLoop();
+    AudioManager.stopAlarmLoop();
     Renderer.removeCountdownBar();
   }
 
@@ -1456,6 +1522,7 @@ var Game = (function() {
    */
   function triggerEndingA() {
     stopCountdown();
+    AudioManager.stopAllAmbience();
     state.gameOver = true;
     deleteSaveGame();
 
@@ -1483,6 +1550,7 @@ var Game = (function() {
     if (state.gameOver) return; // 防止重复触发
     state.gameOver = true;
     stopCountdown();
+    AudioManager.stopAllAmbience();
     deleteSaveGame();
 
     Renderer.stopGlitch();
@@ -1600,6 +1668,7 @@ var Game = (function() {
     if (state.isTrial4Active) {
       Renderer.stopGlitch();
       stopCountdown();
+      AudioManager.stopAllAmbience();
     }
 
     Renderer.showMessage('诊断已重启', 'game-message');
