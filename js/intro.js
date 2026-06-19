@@ -135,6 +135,8 @@ var IntroSystem = (function() {
     bgImg.src = 'assets/img/comic/frame_1.png';
     bgImg.alt = '';
     bgImg.onerror = function() { this.style.display = 'none'; };
+    bgImg.style.transform = 'scale(1.1)';
+    bgImg.style.transformOrigin = 'center center';
     scene.appendChild(bgImg);
 
     // 雨效果叠加
@@ -177,6 +179,8 @@ var IntroSystem = (function() {
     bgImg.src = 'assets/img/comic/frame_3.png';
     bgImg.alt = '';
     bgImg.onerror = function() { this.style.display = 'none'; };
+    bgImg.style.transform = 'scale(1.1)';
+    bgImg.style.transformOrigin = 'center center';
     scene.appendChild(bgImg);
 
     // 暖黄台灯光晕

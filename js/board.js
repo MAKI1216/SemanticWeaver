@@ -1005,6 +1005,20 @@ var BoardSystem = (function() {
     if (!cardData || cardData.cardType !== 'meta') return;
 
     if (targetType === 'dialogue') {
+      // === Stage 检查：Meta 卡只能在对应的 Stage 使用 ===
+      var currentTrial = Game.state ? Game.state.currentTrial : null;
+      var currentStage = Game.state ? Game.state.currentStage : null;
+      if (currentTrial && currentStage && GAME_DATA.TRIALS) {
+        var trialData = GAME_DATA.TRIALS[currentTrial];
+        if (trialData && trialData.stages && trialData.stages[currentStage]) {
+          var expectedMetaCard = trialData.stages[currentStage].hidden_layer_meta_card;
+          if (!expectedMetaCard || expectedMetaCard !== cardData.text) {
+            Renderer.showMessage('现在好像不是使用它的时候……', 'combine-error');
+            return;
+          }
+        }
+      }
+
       // 对话框入侵：检查是否有隐藏台词层
       if (!DialogueSystem.hasHiddenLayer()) {
         // 无隐藏台词层，入侵失败，卡片不消耗

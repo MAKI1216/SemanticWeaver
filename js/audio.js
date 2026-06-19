@@ -29,6 +29,10 @@ var AudioManager = (function() {
   // === 警报状态 ===
   var alarmLoopNode = null;
 
+  // === Trial 4 警报 MP3 ===
+  var alarmMp3El = null;
+  var alarmMp3Gain = null;
+
   // ==================== 初始化 ====================
 
   function init() {
@@ -351,7 +355,7 @@ var AudioManager = (function() {
 
     function initMP3() {
       try {
-        audioEl = new Audio('assets/audio/trial4_countdown.mp3');
+        audioEl = new Audio('assets/audio/trail4_bgm.mp3');
         audioEl.loop = true;
         audioEl.volume = 0.4;
         // 存储引用以便停止时使用
@@ -679,6 +683,43 @@ var AudioManager = (function() {
     }
   }
 
+  // ==================== Trial 4 警报 MP3（循环，与主 BGM 同时播放） ====================
+
+  function startAlarmMp3() {
+    if (alarmMp3El) return;
+    try {
+      alarmMp3El = new Audio('assets/audio/alarm.mp3');
+      alarmMp3El.loop = true;
+      alarmMp3El.volume = 0.35;
+
+      if (ctx) {
+        var sourceNode = ctx.createMediaElementSource(alarmMp3El);
+        alarmMp3Gain = ctx.createGain();
+        alarmMp3Gain.gain.value = 0.35;
+        sourceNode.connect(alarmMp3Gain);
+        alarmMp3Gain.connect(masterGain);
+      }
+
+      alarmMp3El.play().catch(function(e) {
+        console.warn('警报 MP3 播放失败:', e.message);
+      });
+    } catch (e) {
+      console.warn('警报 MP3 加载失败:', e.message);
+    }
+  }
+
+  function stopAlarmMp3() {
+    if (alarmMp3El) {
+      try {
+        alarmMp3El.pause();
+        alarmMp3El.src = '';
+        alarmMp3El.load();
+      } catch(e) {}
+      alarmMp3El = null;
+      alarmMp3Gain = null;
+    }
+  }
+
   function playAlarmBurst() {
     if (!ensureCtx()) return;
     var now = ctx.currentTime;
@@ -788,52 +829,50 @@ var AudioManager = (function() {
     }
   }
 
-  // ==================== P1-C1: 提取关键词专用音 ====================
-
+  // 撕纸音效 — 模拟从页面撕下一张纸的清脆声
   function playKeywordPickup(variant) {
     if (!ensureCtx()) return;
     var now = ctx.currentTime;
     var isFresh = (variant === 'fresh');
 
-    // 温暖柔和的"气泡"音 — 非常轻柔
-    var freq = isFresh ? 280 : 200;
-    var vol = isFresh ? 0.014 : 0.008;
-    var dur = isFresh ? 0.15 : 0.08;
+    // 生成纸张撕裂质感：宽带噪声 + 中高频带通 + 快速爆发
+    function createTearBurst(startTime, duration, centerFreq, q, vol) {
+      var bufSize = Math.floor(ctx.sampleRate * duration);
+      var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+      var d = buf.getChannelData(0);
+      for (var i = 0; i < bufSize; i++) {
+        // 指数衰减包络模拟纤维断裂
+        var env = Math.exp(-i / (bufSize * 0.25));
+        d[i] = (Math.random() * 2 - 1) * env;
+      }
+      var src = ctx.createBufferSource();
+      src.buffer = buf;
+      var bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = centerFreq || 3200;
+      bp.Q.value = q || 1.2;
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0, startTime);
+      g.gain.linearRampToValueAtTime(vol || 0.025, startTime + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      src.connect(bp);
+      bp.connect(g);
+      g.connect(masterGain);
+      sendToReverb(g, 0.15);
+      src.start(startTime);
+      src.stop(startTime + duration + 0.02);
+    }
 
-    var osc = ctx.createOscillator();
-    var g = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, now);
-    // 温柔的下滑（像水滴）
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.7, now + dur);
-
-    // 柔和的包络：慢起音，平滑衰减
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(vol, now + 0.02);
-    g.gain.setValueAtTime(vol, now + dur * 0.4);
-    g.gain.exponentialRampToValueAtTime(0.001, now + dur + 0.05);
-
-    osc.connect(g);
-    g.connect(masterGain);
-    sendToReverb(g, 0.35); // 适度混响增加温暖感
-    osc.start(now);
-    osc.stop(now + dur + 0.1);
-
-    // 叠加一个更轻的高八度泛音，增加质感
     if (isFresh) {
-      var osc2 = ctx.createOscillator();
-      var g2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(freq * 2, now);
-      osc2.frequency.exponentialRampToValueAtTime(freq * 1.4, now + dur);
-      g2.gain.setValueAtTime(0, now);
-      g2.gain.linearRampToValueAtTime(vol * 0.4, now + 0.02);
-      g2.gain.exponentialRampToValueAtTime(0.001, now + dur + 0.03);
-      osc2.connect(g2);
-      g2.connect(masterGain);
-      sendToReverb(g2, 0.4);
-      osc2.start(now);
-      osc2.stop(now + dur + 0.08);
+      // 首次提取：更清晰的撕纸声，多次微爆模拟纤维断裂
+      createTearBurst(now, 0.06, 3500, 1.8, 0.028);
+      createTearBurst(now + 0.015, 0.04, 4200, 2.0, 0.018);
+      createTearBurst(now + 0.03, 0.05, 2800, 1.5, 0.02);
+      createTearBurst(now + 0.05, 0.03, 5000, 2.2, 0.012);
+    } else {
+      // 重复提取：更轻、更短的撕纸尾音
+      createTearBurst(now, 0.03, 3000, 1.5, 0.015);
+      createTearBurst(now + 0.01, 0.02, 3800, 1.8, 0.008);
     }
   }
 
@@ -1220,6 +1259,8 @@ var AudioManager = (function() {
     playAlarmBurst: playAlarmBurst,
     playIndustrialNoise: playIndustrialNoise,
     playDataCorruption: playDataCorruption,
+    startAlarmMp3: startAlarmMp3,
+    stopAlarmMp3: stopAlarmMp3,
 
     // 增强音效
     playKeywordPickup: playKeywordPickup,

@@ -678,6 +678,19 @@ var Game = (function() {
     } catch (e) {
       console.warn('记录矛盾标记失败:', e);
     }
+
+    // 如果矛盾定义了 reveal_text，延迟显示旁白叙事
+    var contradictions = GAME_DATA.semantic_contradictions || [];
+    for (var i = 0; i < contradictions.length; i++) {
+      if (contradictions[i].id === contradictionId && contradictions[i].reveal_text) {
+        (function(text) {
+          setTimeout(function() {
+            DialogueSystem.showNarration(text);
+          }, 1200);
+        })(contradictions[i].reveal_text);
+        break;
+      }
+    }
   }
 
   /**
@@ -733,6 +746,7 @@ var Game = (function() {
     AudioManager.init();
     AudioManager.resume();
     deleteSaveGame();
+    TutorialSystem.reset();
     state.currentTrial = null;
     state.currentStage = null;
     state.completedTrials = [];
@@ -937,6 +951,7 @@ var Game = (function() {
         Renderer.startGlitch();
         AudioManager.stopClinicAmbience();
         AudioManager.playInterrogationAmbience();
+        AudioManager.startCountdownMusic();
         AudioManager.playWarning();
       } else {
         Renderer.showSubmitZone(true);
@@ -1420,8 +1435,8 @@ var Game = (function() {
 
     stopCountdown();
 
-    // 启动倒计时分层音乐 (Tier 1)
-    AudioManager.startCountdownMusic();
+    // 启动警报 MP3（循环，与 BGM 同时播放）
+    AudioManager.startAlarmMp3();
     // 启动心跳 loop (初始 2s 间隔)
     AudioManager.startHeartbeatLoop(2.0);
 
@@ -1509,7 +1524,7 @@ var Game = (function() {
     if (state._industrialInterval) { clearInterval(state._industrialInterval); state._industrialInterval = null; }
     if (state._alarmInterval) { clearInterval(state._alarmInterval); state._alarmInterval = null; }
     if (state._corruptionInterval) { clearInterval(state._corruptionInterval); state._corruptionInterval = null; }
-    AudioManager.stopCountdownMusic();
+    AudioManager.stopAlarmMp3();
     AudioManager.stopHeartbeatLoop();
     AudioManager.stopAlarmLoop();
     Renderer.removeCountdownBar();
