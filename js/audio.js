@@ -42,12 +42,11 @@ var AudioManager = (function() {
   var trail13RainGain = null;
 
   // === 预加载 BGM（在用户点击时立即创建，解决浏览器自动播放策略） ===
+  // Audio 元素在 preloadAllBgm() 中创建并立即 play()（静音），
+  // startXxxBgm() 时直接设 audioEl.volume 即可发声，完全不依赖 Web Audio 路由。
   var preloadedTrial4El = null;
-  var preloadedTrial4Gain = null;
   var preloadedTrail13El = null;
-  var preloadedTrail13Gain = null;
   var preloadedAlarmEl = null;
-  var preloadedAlarmGain = null;
 
   // ==================== 初始化 ====================
 
@@ -90,71 +89,53 @@ var AudioManager = (function() {
    * 创建 Audio 元素并立即 play()，绕过浏览器自动播放策略。
    * 后续 BGM 函数只需调整 gain 即可，无需新建 Audio 元素。
    */
+  /**
+   * 预加载所有 BGM MP3 文件
+   *
+   * 设计原则（彻底解决 Chrome/Edge Autoplay Policy）：
+   * ─────────────────────────────────────────────────
+   * 完全绕过 Web Audio API 路由，直接使用 HTMLMediaElement 的原生 volume 属性。
+   * 不调用 createMediaElementSource，不依赖 AudioContext 的状态。
+   *
+   * Chrome/Edge 只要求 play() 在用户手势调用栈内调用即可，
+   * 与 AudioContext 是否 running 无关。
+   *
+   * 此函数必须在按钮点击等用户手势内同步调用。
+   */
   function preloadAllBgm() {
-    // 已预加载则跳过（Audio 元素和 Web Audio 连接只需创建一次）
+    // 已预加载则跳过
     if (preloadedTrail13El) return;
 
-    // === 关键：在 Chrome/Edge 中解锁 Web Audio ===
-    // Safari 对 Audio.play() 宽容，但 Chromium 浏览器需要在用户手势内
-    // 既 resume AudioContext 又实际输出过声音，才会将页面标记为"已交互"。
+    // 同时 resume AudioContext（供其他 Web Audio 音效使用）
     if (ctx && ctx.state === 'suspended') {
-      ctx.resume();
-    }
-    if (ctx && ctx.state === 'running') {
-      // 播放一个极短的静音脉冲，证明 AudioContext 已被用户手势激活
-      try {
-        var unlockOsc = ctx.createOscillator();
-        var unlockGain = ctx.createGain();
-        unlockOsc.type = 'sine';
-        unlockOsc.frequency.value = 1;  // 1Hz，人耳几乎听不到
-        unlockGain.gain.value = 0.001;  // 近乎静音
-        unlockOsc.connect(unlockGain);
-        unlockGain.connect(masterGain);
-        unlockOsc.start(ctx.currentTime);
-        unlockOsc.stop(ctx.currentTime + 0.05);
-      } catch (e) {}
+      ctx.resume().catch(function(e) {
+        console.warn('AudioContext resume 失败:', e);
+      });
     }
 
-    var bgms = [
-      { el: 'preloadedTrail13El', gain: 'preloadedTrail13Gain', url: 'assets/audio/trail1-3_bgm.mp3', vol: 0 },
-      { el: 'preloadedTrial4El',  gain: 'preloadedTrial4Gain',  url: 'assets/audio/trail4_bgm.mp3',    vol: 0 },
-      { el: 'preloadedAlarmEl',   gain: 'preloadedAlarmGain',   url: 'assets/audio/alarm.mp3',         vol: 0 }
+    var bgmDefs = [
+      { key: 'trail13', url: 'assets/audio/trail1-3_bgm.mp3' },
+      { key: 'trial4',  url: 'assets/audio/trail4_bgm.mp3'   },
+      { key: 'alarm',   url: 'assets/audio/alarm.mp3'         }
     ];
-    var self = this;
 
-    bgms.forEach(function(bgm) {
+    bgmDefs.forEach(function(bgm) {
       try {
         var audioEl = new Audio(bgm.url);
         audioEl.loop = true;
-        audioEl.muted = true;   // Chrome 允许静音播放绕过 autoplay 限制
-        audioEl.volume = 0;     // Safari 兼容
+        audioEl.volume = 0;  // 静音预载，startXxxBgm 时再设实际音量
 
-        var gainNode = null;
-        if (ctx) {
-          var source = ctx.createMediaElementSource(audioEl);
-          gainNode = ctx.createGain();
-          gainNode.gain.value = 0;
-          source.connect(gainNode);
-          gainNode.connect(masterGain);
-        }
-
-        audioEl.play().then(function() {
-          // 播放成功后再取消静音（音频通过 gainNode=0 控制音量）
-          audioEl.muted = false;
-        }).catch(function(e) {
+        // 在手势调用栈内同步调用 play()，Chrome/Edge 会允许
+        audioEl.play().catch(function(e) {
           console.warn('BGM 预播放失败 (' + bgm.url + '):', e.message);
         });
 
-        // 存储引用
-        if (bgm.el === 'preloadedTrail13El') {
+        if (bgm.key === 'trail13') {
           preloadedTrail13El = audioEl;
-          preloadedTrail13Gain = gainNode;
-        } else if (bgm.el === 'preloadedTrial4El') {
+        } else if (bgm.key === 'trial4') {
           preloadedTrial4El = audioEl;
-          preloadedTrial4Gain = gainNode;
-        } else if (bgm.el === 'preloadedAlarmEl') {
+        } else if (bgm.key === 'alarm') {
           preloadedAlarmEl = audioEl;
-          preloadedAlarmGain = gainNode;
         }
       } catch (e) {
         console.warn('BGM 预加载失败 (' + bgm.url + '):', e.message);
@@ -444,39 +425,25 @@ var AudioManager = (function() {
 
     // 尝试加载外部 MP3
     var audioEl = null;
-    var audioSourceNode = null;
-    var audioGain = null;
 
     function initMP3() {
-      // 优先使用预加载的 Audio 元素（已在用户手势期间 unlock）
-      if (preloadedTrial4El && preloadedTrial4Gain) {
+      if (preloadedTrial4El) {
         audioEl = preloadedTrial4El;
+        audioEl.volume = 1.0;  // 直接用原生 volume（不走 Web Audio 路由）
         countdownMusicNodes.audioEl = audioEl;
-        countdownMusicNodes.audioGain = preloadedTrial4Gain;
-        audioGain = preloadedTrial4Gain;
-        audioGain.gain.value = 0.45;
-        // 预加载时已经连接了混响，无需重复
+        countdownMusicNodes.audioGain = null;
+        if (audioEl.paused) {
+          audioEl.play().catch(function(e) {
+            console.warn('Trial4 BGM resume 失败:', e.message);
+          });
+        }
       } else {
-        // 回退：创建新的 Audio 元素
         try {
           audioEl = new Audio('assets/audio/trail4_bgm.mp3');
           audioEl.loop = true;
-          audioEl.volume = 0.4;
+          audioEl.volume = 1.0;
           countdownMusicNodes.audioEl = audioEl;
-
-          if (ctx) {
-            audioSourceNode = ctx.createMediaElementSource(audioEl);
-            audioGain = ctx.createGain();
-            audioGain.gain.value = 0.45;
-            audioSourceNode.connect(audioGain);
-            audioGain.connect(masterGain);
-            countdownMusicNodes.audioGain = audioGain;
-            var wet = ctx.createGain();
-            wet.gain.value = 0.2;
-            audioGain.connect(wet);
-            wet.connect(reverbNode);
-          }
-
+          countdownMusicNodes.audioGain = null;
           audioEl.play().catch(function(e) {
             console.warn('MP3 播放失败，使用程序化合成:', e.message);
             fallbackSynthesis();
@@ -661,9 +628,9 @@ var AudioManager = (function() {
     var n = countdownMusicNodes;
 
     if (n.useMp3 && n.audioEl) {
-      // 预加载元素只静音不销毁
       if (n.audioEl === preloadedTrial4El) {
-        if (n.audioGain) n.audioGain.gain.value = 0;
+        // 预加载元素：静音保留
+        n.audioEl.volume = 0;
       } else {
         try {
           n.audioEl.pause();
@@ -794,27 +761,20 @@ var AudioManager = (function() {
 
   function startAlarmMp3() {
     if (alarmMp3El) return;
-    
-    // 优先使用预加载的 Audio 元素
-    if (preloadedAlarmEl && preloadedAlarmGain) {
+
+    if (preloadedAlarmEl) {
       alarmMp3El = preloadedAlarmEl;
-      alarmMp3Gain = preloadedAlarmGain;
-      alarmMp3Gain.gain.value = 0.35;
+      alarmMp3El.volume = 1.0;  // 警报音效，使用最大音量
+      if (alarmMp3El.paused) {
+        alarmMp3El.play().catch(function(e) {
+          console.warn('警报 MP3 resume 失败:', e.message);
+        });
+      }
     } else {
-      // 回退
       try {
         alarmMp3El = new Audio('assets/audio/alarm.mp3');
         alarmMp3El.loop = true;
-        alarmMp3El.volume = 0.35;
-
-        if (ctx) {
-          var sourceNode = ctx.createMediaElementSource(alarmMp3El);
-          alarmMp3Gain = ctx.createGain();
-          alarmMp3Gain.gain.value = 0.35;
-          sourceNode.connect(alarmMp3Gain);
-          alarmMp3Gain.connect(masterGain);
-        }
-
+        alarmMp3El.volume = 1.0;
         alarmMp3El.play().catch(function(e) {
           console.warn('警报 MP3 播放失败:', e.message);
         });
@@ -826,9 +786,9 @@ var AudioManager = (function() {
 
   function stopAlarmMp3() {
     if (alarmMp3El) {
-      // 预加载元素只静音不销毁
       if (alarmMp3El === preloadedAlarmEl) {
-        if (alarmMp3Gain) alarmMp3Gain.gain.value = 0;
+        // 预加载元素：静音保留
+        alarmMp3El.volume = 0;
       } else {
         try {
           alarmMp3El.pause();
@@ -903,27 +863,22 @@ var AudioManager = (function() {
 
   function startTrail13Bgm() {
     if (trail13BgmEl) return;
-    
-    // 优先使用预加载的 Audio 元素（已在用户手势期间 unlock）
-    if (preloadedTrail13El && preloadedTrail13Gain) {
+
+    if (preloadedTrail13El) {
+      // 直接复用预加载元素，用原生 volume 控制音量（不依赖 Web Audio）
       trail13BgmEl = preloadedTrail13El;
-      trail13BgmGain = preloadedTrail13Gain;
-      trail13BgmGain.gain.value = 0.15;
+      trail13BgmEl.volume = 0.45;  // masterGain=0.35，乘积约 0.16，与原设计接近
+      if (trail13BgmEl.paused) {
+        trail13BgmEl.play().catch(function(e) {
+          console.warn('Trail1-3 BGM resume 失败:', e.message);
+        });
+      }
     } else {
-      // 回退：创建新的 Audio 元素
+      // 回退：直接创建并播放（不连接 Web Audio 图）
       try {
         trail13BgmEl = new Audio('assets/audio/trail1-3_bgm.mp3');
         trail13BgmEl.loop = true;
-        trail13BgmEl.volume = 0.15;
-
-        if (ctx) {
-          var sourceNode = ctx.createMediaElementSource(trail13BgmEl);
-          trail13BgmGain = ctx.createGain();
-          trail13BgmGain.gain.value = 0.15;
-          sourceNode.connect(trail13BgmGain);
-          trail13BgmGain.connect(masterGain);
-        }
-
+        trail13BgmEl.volume = 0.45;
         trail13BgmEl.play().catch(function(e) {
           console.warn('Trail1-3 BGM 播放失败:', e.message);
         });
@@ -938,9 +893,9 @@ var AudioManager = (function() {
 
   function stopTrail13Bgm() {
     if (trail13BgmEl) {
-      // 如果是预加载元素，只静音不销毁
       if (trail13BgmEl === preloadedTrail13El) {
-        if (trail13BgmGain) trail13BgmGain.gain.value = 0;
+        // 预加载元素：静音但保持播放（下次可直接复用）
+        trail13BgmEl.volume = 0;
       } else {
         try {
           trail13BgmEl.pause();

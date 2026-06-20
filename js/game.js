@@ -1951,6 +1951,7 @@ var Game = (function() {
         var trialId = this.getAttribute('data-trial');
         if (trialId) {
           AudioManager.init();
+          AudioManager.preloadAllBgm && AudioManager.preloadAllBgm();
           startFromTrial(trialId);
         }
       });
