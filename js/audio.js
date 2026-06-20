@@ -79,9 +79,6 @@ var AudioManager = (function() {
       reverbReturn.connect(masterGain);
 
       initialized = true;
-      
-      // 预加载所有 BGM（在用户手势期间创建并播放，绕过浏览器自动播放限制）
-      preloadAllBgm();
     } catch (e) {
       console.warn('Web Audio API 不可用:', e);
     }
@@ -1466,6 +1463,7 @@ var AudioManager = (function() {
   return {
     init: init,
     resume: resume,
+    preloadAllBgm: preloadAllBgm,  // 由 game.js 在按钮点击时调用
     mute: function() { if (masterGain) masterGain.gain.value = 0; },
     unmute: function() { if (masterGain) masterGain.gain.value = 0.35; },
 

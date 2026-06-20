@@ -1926,12 +1926,14 @@ var Game = (function() {
     // 新游戏
     btnNew.addEventListener('click', function() {
       AudioManager.init();
+      AudioManager.preloadAllBgm && AudioManager.preloadAllBgm();
       newGame();
     });
 
     // 继续游戏
     btnContinue.addEventListener('click', function() {
       AudioManager.init();
+      AudioManager.preloadAllBgm && AudioManager.preloadAllBgm();
       continueGame();
     });
 
