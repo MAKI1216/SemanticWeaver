@@ -344,6 +344,11 @@ var Game = (function() {
         Renderer.showMessage('最终线索已合成！请将其拖回左侧提交', 'game-message');
       }
     }
+    // 通知提示系统：有效操作
+    if (typeof HintSystem !== 'undefined') {
+      HintSystem.onPlayerAction();
+      HintSystem.reportProgress('card_on_board', resultText);
+    }
   }
 
   /**
@@ -363,6 +368,11 @@ var Game = (function() {
     if (state.combineFailCount === 6 && !state.stuckHintShown.medium) {
       state.stuckHintShown.medium = true;
       showStuckHint('medium');
+    }
+
+    // 通知提示系统：操作失败
+    if (typeof HintSystem !== 'undefined') {
+      HintSystem.onPlayerFail();
     }
   }
 
@@ -447,6 +457,11 @@ var Game = (function() {
     // === 普通提交验证（Trial 1/2/3 非最终 Stage，或 Trial 4 非最终 Stage） ===
     if (cardText === stageData.required_submit) {
       AudioManager.playSubmit();
+      // 通知提示系统：提交成功
+      if (typeof HintSystem !== 'undefined') {
+        HintSystem.onPlayerAction();
+        HintSystem.reportProgress('card_submitted', cardText);
+      }
       Renderer.showFlash('white', 300);
       advanceStage(stageData.next_stage);
     } else {
@@ -573,6 +588,8 @@ var Game = (function() {
    * @param {Object} stageData - 当前 Stage 数据
    */
   function confirmConclusion(conclusion, stageData) {
+    // 立即清除"缺失隐藏关键词"提示定时器，防止它在 final_dialogue 播放途中插入旁白打断对话
+    clearMissingKwHintTimer();
     // 记录结论类型到存档
     try {
       var save = loadGame() || createDefaultSaveData();
@@ -589,6 +606,12 @@ var Game = (function() {
     // 记录到内存状态
     if (!state.conclusionTypes) state.conclusionTypes = {};
     state.conclusionTypes[state.currentTrial] = conclusion.type;
+
+    // 通知提示系统：结论已提交
+    if (typeof HintSystem !== 'undefined') {
+      HintSystem.onPlayerAction();
+      HintSystem.reportProgress('card_submitted', conclusion.recipe ? conclusion.recipe.result : conclusion.label);
+    }
 
     // 显示 final_dialogue
     var finalText = conclusion.npc_reaction.final_dialogue || '';
@@ -663,6 +686,12 @@ var Game = (function() {
    * @param {string} trialId - 所属 Trial ID
    */
   function onContradictionFlagged(contradictionId, trialId) {
+    // 通知提示系统：矛盾标记完成
+    if (typeof HintSystem !== 'undefined') {
+      HintSystem.onPlayerAction();
+      HintSystem.reportProgress('contradiction_flagged', contradictionId);
+    }
+
     // 记录到存档（Phase 4 会完善 trials_state 结构）
     try {
       var save = loadGame() || createDefaultSaveData();
@@ -718,6 +747,12 @@ var Game = (function() {
     }
 
     if (action === 'performed') {
+      // 通知提示系统：Meta 入侵完成
+      if (typeof HintSystem !== 'undefined') {
+        HintSystem.onPlayerAction();
+        HintSystem.reportProgress('meta_used', data.keyword);
+      }
+
       // 记录 Meta 入侵到存档
       try {
         var save2 = loadGame() || createDefaultSaveData();
@@ -875,8 +910,16 @@ var Game = (function() {
           Renderer.showSpecialTarget(true);
           Renderer.startGlitch();
           startCountdown();
+          // Trial 4 不需要提示系统
+          if (typeof HintSystem !== 'undefined') HintSystem.stop();
         } else {
           Renderer.showSubmitZone(true);
+          // 继续游戏时恢复 Trial 1-3 背景音乐和雨声
+          AudioManager.startTrail13Bgm();
+          // 继续游戏时恢复提示系统（进入当前Stage，进度从头算）
+          if (typeof HintSystem !== 'undefined') {
+            HintSystem.enterTrial(state.currentTrial, state.currentStage);
+          }
         }
         runStage(state.currentTrial, state.currentStage);
       }
@@ -921,6 +964,16 @@ var Game = (function() {
     state.currentTrial = trialId;
     state.isTrial4Active = (trialId === 'trial_4');
 
+    // 提示系统：进入新 Trial（清空该 trial 所有 stage 的进度记录）
+    if (typeof HintSystem !== 'undefined') {
+      if (trialId === 'trial_4') {
+        HintSystem.stop(); // Trial 4 不需要提示系统
+      } else {
+        var firstStageId = Object.keys(trialData.stages)[0];
+        HintSystem.enterTrial(trialId, firstStageId);
+      }
+    }
+
     updateHUDForTrial(trialId);
 
     // Phase A.6: Trial 4 入口仪式过场（Phase B 启用）
@@ -950,6 +1003,7 @@ var Game = (function() {
         Renderer.showSpecialTarget(true);
         Renderer.startGlitch();
         AudioManager.stopClinicAmbience();
+        AudioManager.stopTrail13Bgm();
         AudioManager.playInterrogationAmbience();
         AudioManager.startCountdownMusic();
         AudioManager.playWarning();
@@ -960,6 +1014,7 @@ var Game = (function() {
         AudioManager.stopHeartbeatLoop();
         AudioManager.stopAlarmLoop();
         AudioManager.playClinicAmbience();
+        AudioManager.startTrail13Bgm();
       }
 
       DialogueSystem.clearDialogue();
@@ -974,12 +1029,6 @@ var Game = (function() {
         }
       });
 
-      if (state.isTrial4Active) {
-        // 只有进入最终 Stage 才启动倒计时
-        if (stageData.is_final_stage) {
-          startCountdown();
-        }
-      }
     });
   }
 
@@ -1039,7 +1088,9 @@ var Game = (function() {
 
     if (missingKeywords.length > 0) {
       // 延迟 15 秒后显示提示（给玩家先尝试合成的时间）
-      setTimeout(function() {
+      if (state._missingKwHintTimer) { clearTimeout(state._missingKwHintTimer); }
+      state._missingKwHintTimer = setTimeout(function() {
+        state._missingKwHintTimer = null;
         // 再次检查（玩家可能在这段时间内通过 Meta 入侵获得了关键词）
         var currentCards = BoardSystem.getAllCards();
         var currentTexts = currentCards.map(function(c) { return c.text; });
@@ -1048,22 +1099,44 @@ var Game = (function() {
         });
 
         if (stillMissing.length > 0) {
-          // 找出当前 Trial 中哪些 Stage 有 hidden_layer_meta_card
+          // 只收集当前 Trial 中**仍在推演板上**的 Meta 卡（即尚未被使用的）
+          // 同时也排除当前 Stage 自身（最终 Stage 不应有 meta 卡要用）
           var trialData = GAME_DATA.trials[state.currentTrial];
           var metaHints = [];
-          for (var sid in trialData.stages) {
-            if (trialData.stages[sid].hidden_layer_meta_card) {
-              metaHints.push(trialData.stages[sid].hidden_layer_meta_card);
+          var stageIds = Object.keys(trialData.stages);
+          var currentStageIdx = stageIds.indexOf(state.currentStage);
+          // 只看最终 Stage 之前的各阶段
+          for (var si = 0; si < currentStageIdx; si++) {
+            var sid = stageIds[si];
+            var metaCard = trialData.stages[sid].hidden_layer_meta_card;
+            if (metaCard && currentTexts.indexOf(metaCard) >= 0) {
+              // Meta 卡还在板上（未被使用），才提示
+              metaHints.push(metaCard);
             }
           }
 
-          var hintMsg = '（她突然压低声音，像是想起了什么。）\n\n「医生……我总觉得有些东西被我漏掉了。那些'
+          if (metaHints.length === 0) {
+            // 所有 Meta 卡都已用完或不在板上，不显示此提示
+            return;
+          }
+
+          var hintMsg = '（他突然压低声音，像是想起了什么。）\n\n「医生……我总觉得有些东西被我漏掉了。那些'
                       + metaHints.join('、')
                       + '……你有没有试过把它们拖到这里来看看？也许它们能看到我看不到的东西。」';
 
           DialogueSystem.showNarration(hintMsg);
         }
       }, 15000);
+    }
+  }
+
+  /**
+   * 清除"缺失隐藏关键词"提示定时器（提交结论或切换Stage时调用）
+   */
+  function clearMissingKwHintTimer() {
+    if (state._missingKwHintTimer) {
+      clearTimeout(state._missingKwHintTimer);
+      state._missingKwHintTimer = null;
     }
   }
 
@@ -1084,7 +1157,14 @@ var Game = (function() {
     state.stageEnterTime = Date.now();
     state.stuckHintShown = { light: false, medium: false };
     if (state.stuckTimer) { clearTimeout(state.stuckTimer); state.stuckTimer = null; }
+    // 清除"缺失隐藏关键词"提示定时器（避免跨 Stage 插入旁白）
+    clearMissingKwHintTimer();
     saveGame();
+
+    // 提示系统：进入新 Stage（同 Trial 内切换，保留已完成进度）
+    if (typeof HintSystem !== 'undefined' && trialId !== 'trial_4') {
+      HintSystem.enterStage(stageId);
+    }
 
     var stageData = trialData.stages[stageId];
 
@@ -1253,6 +1333,10 @@ var Game = (function() {
 
     // 正常流程：显示 outro → 过场 → 下一关
     DialogueSystem.archiveCurrentDialogue();
+    // Trail 3 提交最终结论后立即停止 BGM 和雨声（Trial 4 进入时会换音效）
+    if (trialId === 'trial_3') {
+      AudioManager.stopTrail13Bgm();
+    }
     DialogueSystem.showNarration(trialData.outro, function() {
       stopCountdown();
 
@@ -1314,6 +1398,11 @@ var Game = (function() {
     state.gameOver = true;
     stopCountdown();
 
+    // 记录假结局解锁
+    if (typeof EndingGallery !== 'undefined') {
+      EndingGallery.unlockEnding('fake');
+    }
+
     // 收集玩家提交了假结论的 Trial
     var falseTrials = [];
     var trialQuestions = {
@@ -1339,6 +1428,11 @@ var Game = (function() {
     var overlay = document.createElement('div');
     overlay.className = 'false-ending-overlay';
 
+    // 添加结局标题
+    var titleEl = document.createElement('div');
+    titleEl.className = 'false-ending-title';
+    titleEl.textContent = '结局：未竟的追问';
+
     // Step 1: 画面渐暗 + CRT 关闭效果
     document.body.classList.add('crt-shutdown');
     AudioManager.playWarning && AudioManager.playWarning();
@@ -1350,6 +1444,10 @@ var Game = (function() {
       overlay.style.background = '#000';
       overlay.style.opacity = '1';
       document.body.appendChild(overlay);
+
+      // 标题先行显示
+      overlay.appendChild(titleEl);
+      titleEl.classList.add('false-ending-title-visible');
 
       setTimeout(function() {
         // Step 3: 打字机显示反问句
@@ -1541,6 +1639,11 @@ var Game = (function() {
     state.gameOver = true;
     deleteSaveGame();
 
+    // 记录好结局（烧毁大脑熔断服务器）解锁
+    if (typeof EndingGallery !== 'undefined') {
+      EndingGallery.unlockEnding('good');
+    }
+
     Renderer.stopGlitch();
     Renderer.showFlash('white', 1000);
 
@@ -1567,6 +1670,11 @@ var Game = (function() {
     stopCountdown();
     AudioManager.stopAllAmbience();
     deleteSaveGame();
+
+    // 记录坏结局（被格式化）解锁
+    if (typeof EndingGallery !== 'undefined') {
+      EndingGallery.unlockEnding('bad');
+    }
 
     Renderer.stopGlitch();
     AudioManager.playWarning();
@@ -1670,6 +1778,11 @@ var Game = (function() {
     state.combineFailCount = 0;
     state.stuckHintShown = { light: false, medium: false };
 
+    // 3.5. 重置 BoardSystem 内存中的矛盾标记记录
+    if (typeof BoardSystem !== 'undefined' && BoardSystem.resetContradictions) {
+      BoardSystem.resetContradictions();
+    }
+
     // 4. 清空推演板和对话
     BoardSystem.clearBoard();
     BoardSystem.initSkillCards();
@@ -1687,7 +1800,12 @@ var Game = (function() {
     }
 
     Renderer.showMessage('诊断已重启', 'game-message');
-    startTrial(state.currentTrial);
+
+    // 关键修复：重置 currentTrial 为 null，确保 runStage 里 isNewTrial === true
+    // 从而强制清空推演板（同 Trial 重启时 isNewTrial 原本为 false，导致卡片残留）
+    var trialToRestart = state.currentTrial;
+    state.currentTrial = null;
+    startTrial(trialToRestart);
   }
 
   /**
@@ -1795,6 +1913,11 @@ var Game = (function() {
     // Phase A.4: 初始化开场动画系统
     IntroSystem.init();
 
+    // 初始化结局画廊系统
+    if (typeof EndingGallery !== 'undefined') {
+      EndingGallery.init();
+    }
+
     // 检测存档
     if (hasSaveGame()) {
       btnContinue.style.display = 'inline-block';
@@ -1818,23 +1941,24 @@ var Game = (function() {
       location.reload();
     });
 
-    // === 调试关卡选择（由 debug-config.js 控制显隐） ===
+    // === 调试关卡选择（由 debug-config.js 或结局解锁控制显隐） ===
+    // 无论当前是否显示，都提前绑定按钮事件（显示状态由 EndingGallery 动态控制）
+    var debugBtns = document.querySelectorAll('.debug-trial-btn');
+    debugBtns.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var trialId = this.getAttribute('data-trial');
+        if (trialId) {
+          AudioManager.init();
+          startFromTrial(trialId);
+        }
+      });
+    });
+    // 若 debug-config.js 参数为 yes，则立即显示面板
     if (typeof DEBUG_SHOW_TRIAL_SELECT !== 'undefined' && DEBUG_SHOW_TRIAL_SELECT === 'yes') {
       var debugSelect = document.getElementById('debug-trial-select');
       if (debugSelect) {
         debugSelect.style.display = 'block';
       }
-      // 绑定关卡选择按钮
-      var debugBtns = document.querySelectorAll('.debug-trial-btn');
-      debugBtns.forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          var trialId = this.getAttribute('data-trial');
-          if (trialId) {
-            AudioManager.init();
-            startFromTrial(trialId);
-          }
-        });
-      });
     }
 
     // Phase A.4: 页面加载后自动播放开场动画
@@ -1859,6 +1983,7 @@ var Game = (function() {
     newGame: newGame,
     continueGame: continueGame,
     triggerEndingA: triggerEndingA,
-    triggerEndingB: triggerEndingB
+    triggerEndingB: triggerEndingB,
+    startFromTrial: startFromTrial
   };
 })();

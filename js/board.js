@@ -113,6 +113,7 @@ var BoardSystem = (function() {
     el.textContent = text;
     el.dataset.cardId = cardData.id;
     el.dataset.cardType = cardType;
+    el.dataset.cardText = text;  // 供 HintSystem 精确匹配
     el.style.left = x + 'px';
     el.style.top = y + 'px';
 
@@ -177,6 +178,14 @@ var BoardSystem = (function() {
 
     // 更新矛盾标记按钮提示
     updateMarkButtonHint();
+
+    // 提示系统：通知卡片上板（涵盖提取关键词、合成结果上板）
+    if (typeof HintSystem !== 'undefined') {
+      HintSystem.onPlayerAction();
+      HintSystem.reportProgress('card_on_board', text);
+      // 对话中关键词被提取（来自 keyword 拖拽时调用 createCard）
+      HintSystem.reportProgress('card_extracted', text);
+    }
 
     return cardData;
   }
@@ -1008,8 +1017,8 @@ var BoardSystem = (function() {
       // === Stage 检查：Meta 卡只能在对应的 Stage 使用 ===
       var currentTrial = Game.state ? Game.state.currentTrial : null;
       var currentStage = Game.state ? Game.state.currentStage : null;
-      if (currentTrial && currentStage && GAME_DATA.TRIALS) {
-        var trialData = GAME_DATA.TRIALS[currentTrial];
+      if (currentTrial && currentStage && GAME_DATA.trials) {
+        var trialData = GAME_DATA.trials[currentTrial];
         if (trialData && trialData.stages && trialData.stages[currentStage]) {
           var expectedMetaCard = trialData.stages[currentStage].hidden_layer_meta_card;
           if (!expectedMetaCard || expectedMetaCard !== cardData.text) {
@@ -1155,7 +1164,7 @@ var BoardSystem = (function() {
           var purifiedCard = createCard(textB, resultX, resultY, { animate: true, cardType: 'normal' });
           Renderer.showCombineSuccess(e.clientX, e.clientY);
           Renderer.showMessage('\u5931\u771F\u5F97\u5230\u51C0\u5316\uFF01', 'game-message');
-          AudioManager.playSuccess();
+          AudioManager.playPurifySuccess();
         }, 300);
         return;
       }
@@ -1615,6 +1624,11 @@ var BoardSystem = (function() {
     getDistortedCount: getDistortedCount,
     enterMarkingMode: enterMarkingMode,
     exitMarkingMode: exitMarkingMode,
+    resetContradictions: function() {
+      flaggedContradictions = [];
+      markingMode = false;
+      markedCards = [];
+    },
     returnCardToBoard: function(text) {
       // 退回卡片到推演板（结论取消时使用）
       var boardEl = document.getElementById('board-cards');

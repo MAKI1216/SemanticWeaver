@@ -3160,6 +3160,28 @@ body.countdown-active #game-screen::after {
   opacity: 0;
 }
 
+.intro-audio-prompt {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.7);
+}
+.intro-audio-prompt span {
+  font-family: 'Courier New', 'Noto Sans SC', monospace;
+  font-size: 1.4rem;
+  color: #c8c8c8;
+  letter-spacing: 0.25em;
+  animation: intro-audio-prompt-pulse 2s ease-in-out infinite;
+}
+@keyframes intro-audio-prompt-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
 /* 淡入效果 */
 .intro-fade-in {
   animation: intro-fade-in-anim 0.8s ease-out forwards;
@@ -3360,6 +3382,20 @@ body.countdown-active #game-screen::after {
   transition: opacity 0.5s ease;
 }
 
+.false-ending-title {
+  font-size: 2rem;
+  color: #c8c8c8;
+  letter-spacing: 0.2em;
+  text-align: center;
+  margin-bottom: 40px;
+  opacity: 0;
+  transition: opacity 1.5s ease;
+}
+
+.false-ending-title-visible {
+  opacity: 1;
+}
+
 .false-ending-text {
   font-family: var(--font-mono, 'Courier New', monospace);
   font-size: 1.1rem;
@@ -3433,4 +3469,360 @@ body.countdown-active #game-screen::after {
 @keyframes card-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(212, 160, 86, 0); }
   50% { box-shadow: 0 0 12px 3px rgba(212, 160, 86, 0.4); }
+}
+
+/* ================================================================
+   HintSystem：智能提示系统 — 边缘高亮闪烁样式
+   ================================================================ */
+
+/* 对话区关键词：蓝紫色边缘闪烁（提示提取） */
+@keyframes hint-blink-dialogue {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(130, 90, 240, 0);
+    outline: 2px solid transparent;
+  }
+  40% {
+    box-shadow: 0 0 10px 3px rgba(130, 90, 240, 0.7), 0 0 20px 6px rgba(130, 90, 240, 0.3);
+    outline: 2px solid rgba(150, 110, 255, 0.9);
+  }
+}
+
+.hint-blink-dialogue {
+  animation: hint-blink-dialogue 1s ease-in-out infinite !important;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+/* 推演板卡片：金色边缘闪烁（提示合成/提交/矛盾） */
+@keyframes hint-blink-board {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(212, 160, 86, 0);
+    outline: 2px solid transparent;
+  }
+  40% {
+    box-shadow: 0 0 14px 4px rgba(212, 160, 86, 0.8), 0 0 28px 8px rgba(212, 160, 86, 0.3);
+    outline: 2px solid rgba(255, 200, 80, 0.95);
+  }
+}
+
+.hint-blink-board {
+  animation: hint-blink-board 1s ease-in-out infinite !important;
+}
+
+/* 技能卡：橙色脉冲（提示感官重构） */
+@keyframes hint-blink-skill {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 120, 30, 0);
+    outline: 2px solid transparent;
+  }
+  40% {
+    box-shadow: 0 0 12px 4px rgba(255, 120, 30, 0.75), 0 0 24px 8px rgba(255, 120, 30, 0.25);
+    outline: 2px solid rgba(255, 140, 50, 0.9);
+  }
+}
+
+.hint-blink-skill {
+  animation: hint-blink-skill 1s ease-in-out infinite !important;
+}
+
+/* 提交区：绿色边缘闪烁（提示提交） */
+@keyframes hint-blink-submit {
+  0%, 100% {
+    box-shadow: inset 0 0 0 0 rgba(80, 200, 120, 0);
+    border-color: rgba(80, 200, 120, 0.2);
+  }
+  40% {
+    box-shadow: inset 0 0 14px 4px rgba(80, 200, 120, 0.35), 0 0 18px 6px rgba(80, 200, 120, 0.5);
+    border-color: rgba(80, 200, 120, 0.9);
+  }
+}
+
+.hint-blink-submit {
+  animation: hint-blink-submit 1s ease-in-out infinite !important;
+}
+
+/* 对话框整体：青色边缘（提示Meta入侵） */
+@keyframes hint-blink-target {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(60, 200, 220, 0);
+    outline: 2px solid transparent;
+  }
+  40% {
+    box-shadow: 0 0 14px 5px rgba(60, 200, 220, 0.5), 0 0 28px 10px rgba(60, 200, 220, 0.2);
+    outline: 2px solid rgba(80, 220, 240, 0.8);
+  }
+}
+
+.hint-blink-target {
+  animation: hint-blink-target 1s ease-in-out infinite !important;
+  border-radius: 4px;
+}
+
+/* NPC 气泡提示 */
+.hint-npc-bubble {
+  display: inline-block;
+  margin: 8px 0 4px 0;
+  padding: 8px 14px;
+  background: rgba(80, 60, 100, 0.75);
+  border: 1px solid rgba(130, 90, 240, 0.5);
+  border-left: 3px solid rgba(130, 90, 240, 0.9);
+  border-radius: 4px;
+  color: rgba(200, 180, 240, 0.95);
+  font-size: 0.88rem;
+  font-style: italic;
+  line-height: 1.4;
+  animation: hint-bubble-in 0.3s ease-out;
+  box-shadow: 0 0 10px rgba(130, 90, 240, 0.2);
+  max-width: 100%;
+  word-break: break-all;
+}
+
+@keyframes hint-bubble-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== 结局CG画廊 ==================== */
+
+#ending-gallery-screen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  background: var(--bg-primary);
+  overflow-y: auto;
+  position: relative;
+}
+
+#ending-gallery-screen::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: url('../assets/img/backgrounds/bg_opening.png');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.06;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#gallery-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 960px;
+  padding: 48px 32px 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+}
+
+#gallery-header {
+  text-align: center;
+  animation: titleFadeIn 0.8s ease-out;
+}
+
+#gallery-title {
+  font-size: 2.2rem;
+  font-weight: bold;
+  color: var(--text-primary);
+  letter-spacing: 0.4em;
+  text-shadow: 0 0 18px rgba(212, 160, 86, 0.4);
+}
+
+#gallery-subtitle-text {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  letter-spacing: 0.5em;
+  opacity: 0.6;
+}
+
+/* 三格横排网格 */
+#gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  width: 100%;
+}
+
+.gallery-item {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-wood);
+  background: var(--bg-secondary);
+  transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+  cursor: default;
+  animation: gallery-item-in 0.5s ease-out both;
+}
+
+.gallery-item.unlocked {
+  cursor: pointer;
+  border-color: var(--border-light);
+}
+
+.gallery-item.unlocked:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 28px rgba(212, 160, 86, 0.25);
+  border-color: var(--accent-warm);
+}
+
+@keyframes gallery-item-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.gallery-cg-wrap {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #0a0a0f;
+  position: relative;
+}
+
+.gallery-cg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.gallery-item.unlocked:hover .gallery-cg {
+  transform: scale(1.04);
+}
+
+.gallery-cg-locked-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0f;
+}
+
+.gallery-cg-locked {
+  font-size: 3rem;
+  color: var(--text-muted);
+  opacity: 0.3;
+  user-select: none;
+}
+
+.gallery-info {
+  padding: 14px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gallery-subtitle {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.gallery-name {
+  font-size: 1rem;
+  color: var(--accent-warm);
+  letter-spacing: 0.15em;
+  font-weight: bold;
+}
+
+.gallery-name-locked {
+  color: var(--text-muted);
+  opacity: 0.4;
+  font-weight: normal;
+}
+
+.gallery-desc {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  letter-spacing: 0.05em;
+}
+
+#gallery-footer {
+  text-align: center;
+}
+
+/* ==================== CG 全屏查看器 ==================== */
+
+#gallery-cg-viewer {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.88);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+#gallery-cg-viewer.visible {
+  opacity: 1;
+}
+
+#viewer-panel {
+  position: relative;
+  max-width: 85vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: viewer-in 0.3s ease-out;
+}
+
+@keyframes viewer-in {
+  from { transform: scale(0.94); }
+  to   { transform: scale(1); }
+}
+
+#viewer-close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 32px;
+  height: 32px;
+  background: rgba(212, 160, 86, 0.15);
+  border: 1px solid var(--accent-warm);
+  color: var(--accent-warm);
+  font-size: 0.9rem;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 0.2s;
+}
+
+#viewer-close:hover {
+  background: rgba(212, 160, 86, 0.35);
+}
+
+#viewer-img {
+  max-width: 100%;
+  max-height: 76vh;
+  object-fit: contain;
+  display: block;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
+}
+
+#viewer-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+#viewer-subtitle {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.4em;
+}
+
+#viewer-name {
+  font-size: 1.1rem;
+  color: var(--accent-warm);
+  letter-spacing: 0.25em;
+  text-shadow: 0 0 10px rgba(212, 160, 86, 0.4);
 }

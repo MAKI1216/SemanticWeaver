@@ -21,10 +21,11 @@
             <div id="title-buttons">
                 <button id="btn-new-game" class="title-btn">开始游戏</button>
                 <button id="btn-continue" class="title-btn" style="display:none;">继续游戏</button>
+                <button id="btn-ending-gallery" class="title-btn" style="display:none;">结局一览</button>
             </div>
             <!-- 调试关卡选择（由 debug-config.js 控制显隐） -->
             <div id="debug-trial-select" style="display:none;">
-                <p id="debug-select-label">—— 调试：选择起始关卡 ——</p>
+                <p id="debug-select-label">—— 选择起始关卡 ——</p>
                 <div id="debug-trial-buttons">
                     <button class="debug-trial-btn" data-trial="trial_1">Trial 1</button>
                     <button class="debug-trial-btn" data-trial="trial_2">Trial 2</button>
@@ -132,6 +133,31 @@
         </div>
     </div>
 
+    <!-- ==================== 结局画廊画面 ==================== -->
+    <div id="ending-gallery-screen" class="screen">
+        <div id="gallery-content">
+            <div id="gallery-header">
+                <h2 id="gallery-title">结局一览</h2>
+                <p id="gallery-subtitle-text">ENDINGS ARCHIVE</p>
+            </div>
+            <div id="gallery-grid"></div>
+            <div id="gallery-footer">
+                <button id="btn-gallery-back" class="title-btn">返回菜单</button>
+            </div>
+        </div>
+        <!-- CG 全屏查看器 -->
+        <div id="gallery-cg-viewer" style="display:none;">
+            <div id="viewer-panel">
+                <button id="viewer-close">✕</button>
+                <img id="viewer-img" src="#" alt="">
+                <div id="viewer-caption">
+                    <span id="viewer-subtitle"></span>
+                    <span id="viewer-name"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== 合成特效层 ==================== -->
     <div id="combine-effect" style="display:none;"></div>
     <div id="flash-overlay" style="display:none;"></div>
@@ -141,6 +167,7 @@
     <!-- 调试配置（上线时修改 debug-config.js 中参数为 "no" 即可隐藏关卡选择） -->
     <script src="debug-config.js"></script>
     <script src="data/game-data.js"></script>
+    <script src="data/hint-data.js"></script>
     <script src="js/audio.js"></script>
     <script src="js/renderer.js"></script>
     <script src="js/dialogue.js"></script>
@@ -148,6 +175,8 @@
     <script src="js/tutorial.js"></script>
     <script src="js/cutscene.js"></script>
     <script src="js/intro.js"></script>
+    <script src="js/hint-system.js"></script>
+    <script src="js/ending-gallery.js"></script>
     <script src="js/game.js"></script>
 </body>
 </html>

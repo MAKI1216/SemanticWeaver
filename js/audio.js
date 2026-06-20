@@ -33,6 +33,14 @@ var AudioManager = (function() {
   var alarmMp3El = null;
   var alarmMp3Gain = null;
 
+  // === Trial 1-3 背景音乐 MP3 ===
+  var trail13BgmEl = null;
+  var trail13BgmGain = null;
+
+  // === Trial 1-3 雨声（与开场动画同款，循环） ===
+  var trail13RainSource = null;
+  var trail13RainGain = null;
+
   // ==================== 初始化 ====================
 
   function init() {
@@ -720,6 +728,140 @@ var AudioManager = (function() {
     }
   }
 
+  // ==================== Trial 1-3 背景音乐 MP3 ====================
+
+  // ==================== Trial 1-3 雨声（与开场动画同款，循环） ====================
+
+  function startTrail13Rain() {
+    if (trail13RainSource || !ensureCtx()) return;
+    try {
+      // 白噪音缓冲（2秒循环，与 intro 完全相同的滤波参数）
+      var bufferSize = ctx.sampleRate * 2;
+      var buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      var data = buffer.getChannelData(0);
+      for (var i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+
+      var source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+
+      // 低通滤波（截止 800Hz，与 intro 一致）
+      var filter1 = ctx.createBiquadFilter();
+      filter1.type = 'lowpass';
+      filter1.frequency.value = 800;
+      filter1.Q.value = 0.5;
+
+      // 高通滤波去除极低频（200Hz，与 intro 一致）
+      var filter2 = ctx.createBiquadFilter();
+      filter2.type = 'highpass';
+      filter2.frequency.value = 200;
+
+      trail13RainGain = ctx.createGain();
+      trail13RainGain.gain.value = 0; // 从静音渐入
+
+      source.connect(filter1);
+      filter1.connect(filter2);
+      filter2.connect(trail13RainGain);
+      trail13RainGain.connect(masterGain);
+
+      source.start();
+      trail13RainSource = source;
+
+      // 渐入至 75% 原始音量（intro 原值 0.12 × 0.75 = 0.09）
+      trail13RainGain.gain.linearRampToValueAtTime(0.09, ctx.currentTime + 3);
+    } catch (e) {
+      console.warn('Trail1-3 雨声启动失败:', e);
+    }
+  }
+
+  function stopTrail13Rain() {
+    if (!trail13RainSource || !ctx) return;
+    try {
+      trail13RainGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.8);
+      trail13RainSource.stop(ctx.currentTime + 0.9);
+    } catch(e) {}
+    trail13RainSource = null;
+    trail13RainGain = null;
+  }
+
+  // ==================== Trial 1-3 背景音乐 MP3 ====================
+
+  function startTrail13Bgm() {
+    if (trail13BgmEl) return;
+    try {
+      trail13BgmEl = new Audio('assets/audio/trail1-3_bgm.mp3');
+      trail13BgmEl.loop = true;
+      trail13BgmEl.volume = 0.15; // 原 0.5 × 75%
+
+      if (ctx) {
+        var sourceNode = ctx.createMediaElementSource(trail13BgmEl);
+        trail13BgmGain = ctx.createGain();
+        trail13BgmGain.gain.value = 0.15; // 原 0.5 × 75%
+        sourceNode.connect(trail13BgmGain);
+        trail13BgmGain.connect(masterGain);
+      }
+
+      trail13BgmEl.play().catch(function(e) {
+        console.warn('Trail1-3 BGM 播放失败:', e.message);
+      });
+    } catch (e) {
+      console.warn('Trail1-3 BGM 加载失败:', e.message);
+    }
+
+    // 同步启动雨声
+    startTrail13Rain();
+  }
+
+  function stopTrail13Bgm() {
+    if (trail13BgmEl) {
+      try {
+        trail13BgmEl.pause();
+        trail13BgmEl.src = '';
+        trail13BgmEl.load();
+      } catch(e) {}
+      trail13BgmEl = null;
+      trail13BgmGain = null;
+    }
+
+    // 同步停止雨声
+    stopTrail13Rain();
+  }
+
+  // ==================== 净化专用音效（75% 音量） ====================
+
+  function playPurifySuccess() {
+    if (!ensureCtx()) return;
+    var notes = [523.25, 659.25, 783.99];
+    var now = ctx.currentTime;
+    notes.forEach(function(freq, i) {
+      var osc = ctx.createOscillator();
+      var g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      g.gain.setValueAtTime(0, now + i * 0.1);
+      g.gain.linearRampToValueAtTime(0.075, now + i * 0.1 + 0.01); // 0.1 * 75% = 0.075
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.5);
+      osc.connect(g);
+      g.connect(masterGain);
+      sendToReverb(g, 0.2);
+      osc.start(now + i * 0.1);
+      osc.stop(now + i * 0.1 + 0.55);
+    });
+    // 高频点缀（原0.03 * 75% = 0.0225）
+    var oscH = ctx.createOscillator();
+    var gH = ctx.createGain();
+    oscH.type = 'sine';
+    oscH.frequency.value = 2400;
+    gH.gain.setValueAtTime(0.0225, now + 0.35);
+    gH.gain.exponentialRampToValueAtTime(0.001, now + 0.41);
+    oscH.connect(gH);
+    gH.connect(masterGain);
+    oscH.start(now + 0.35);
+    oscH.stop(now + 0.42);
+  }
+
   function playAlarmBurst() {
     if (!ensureCtx()) return;
     var now = ctx.currentTime;
@@ -1216,6 +1358,7 @@ var AudioManager = (function() {
     stopCountdownMusic();
     stopHeartbeatLoop();
     stopAlarmLoop();
+    stopTrail13Bgm(); // 内部会同时调用 stopTrail13Rain
   }
 
   // ==================== 公开接口 ====================
@@ -1261,6 +1404,15 @@ var AudioManager = (function() {
     playDataCorruption: playDataCorruption,
     startAlarmMp3: startAlarmMp3,
     stopAlarmMp3: stopAlarmMp3,
+
+    // Trial 1-3 背景音乐 + 雨声
+    startTrail13Bgm: startTrail13Bgm,
+    stopTrail13Bgm: stopTrail13Bgm,
+    startTrail13Rain: startTrail13Rain,
+    stopTrail13Rain: stopTrail13Rain,
+
+    // 净化音效（75% 音量）
+    playPurifySuccess: playPurifySuccess,
 
     // 增强音效
     playKeywordPickup: playKeywordPickup,

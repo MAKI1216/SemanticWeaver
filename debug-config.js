@@ -7,4 +7,4 @@
  *
  * 修改此参数后刷新页面即可生效，无需修改其他代码。
  */
-var DEBUG_SHOW_TRIAL_SELECT = "yes";
+var DEBUG_SHOW_TRIAL_SELECT = "no";

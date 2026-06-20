@@ -278,6 +278,32 @@ var IntroSystem = (function() {
     overlayEl.style.opacity = '1';
     skipBtnEl.style.display = 'block';
 
+    // 预创建 AudioContext 并检查浏览器自动播放策略
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      // 浏览器阻止了自动播放 — 显示"点击开始"提示
+      var promptEl = document.createElement('div');
+      promptEl.className = 'intro-audio-prompt';
+      promptEl.innerHTML = '<span>点击任意位置开始</span>';
+      overlayEl.appendChild(promptEl);
+
+      await new Promise(function(resolve) {
+        var handler = function() {
+          audioCtx.resume().then(function() {
+            promptEl.remove();
+            overlayEl.removeEventListener('click', handler);
+            resolve();
+          }).catch(function() {
+            // 仍然失败，继续尝试
+            resolve();
+          });
+        };
+        overlayEl.addEventListener('click', handler);
+      });
+    }
+
     try {
       // === Step 1 [0-3s]: 黑屏 → 雨声渐入 ===
       sceneEl.innerHTML = '';
@@ -334,7 +360,7 @@ var IntroSystem = (function() {
       // 打字机文字："第一位病人已到达"
       var text1 = createTextElement('', 'intro-text-clinic');
       clinicScene.appendChild(text1);
-      await typewrite(text1, '「第一位病人已到达。」', 80);
+      await typewrite(text1, '「医生，病人已经到了。」', 80);
       await wait(1500);
 
       // === Step 4 [12-18s]: CRT 启动动画 ===
