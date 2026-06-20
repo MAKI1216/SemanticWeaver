@@ -91,6 +91,30 @@ var AudioManager = (function() {
    * 后续 BGM 函数只需调整 gain 即可，无需新建 Audio 元素。
    */
   function preloadAllBgm() {
+    // 已预加载则跳过（Audio 元素和 Web Audio 连接只需创建一次）
+    if (preloadedTrail13El) return;
+
+    // === 关键：在 Chrome/Edge 中解锁 Web Audio ===
+    // Safari 对 Audio.play() 宽容，但 Chromium 浏览器需要在用户手势内
+    // 既 resume AudioContext 又实际输出过声音，才会将页面标记为"已交互"。
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    if (ctx && ctx.state === 'running') {
+      // 播放一个极短的静音脉冲，证明 AudioContext 已被用户手势激活
+      try {
+        var unlockOsc = ctx.createOscillator();
+        var unlockGain = ctx.createGain();
+        unlockOsc.type = 'sine';
+        unlockOsc.frequency.value = 1;  // 1Hz，人耳几乎听不到
+        unlockGain.gain.value = 0.001;  // 近乎静音
+        unlockOsc.connect(unlockGain);
+        unlockGain.connect(masterGain);
+        unlockOsc.start(ctx.currentTime);
+        unlockOsc.stop(ctx.currentTime + 0.05);
+      } catch (e) {}
+    }
+
     var bgms = [
       { el: 'preloadedTrail13El', gain: 'preloadedTrail13Gain', url: 'assets/audio/trail1-3_bgm.mp3', vol: 0 },
       { el: 'preloadedTrial4El',  gain: 'preloadedTrial4Gain',  url: 'assets/audio/trail4_bgm.mp3',    vol: 0 },
@@ -102,18 +126,22 @@ var AudioManager = (function() {
       try {
         var audioEl = new Audio(bgm.url);
         audioEl.loop = true;
-        audioEl.volume = 0;  // 静音预播放，仅用于"解锁"浏览器自动播放
-        
+        audioEl.muted = true;   // Chrome 允许静音播放绕过 autoplay 限制
+        audioEl.volume = 0;     // Safari 兼容
+
         var gainNode = null;
         if (ctx) {
           var source = ctx.createMediaElementSource(audioEl);
           gainNode = ctx.createGain();
-          gainNode.gain.value = 0;  // 初始静音，后续由 BGM 函数调整
+          gainNode.gain.value = 0;
           source.connect(gainNode);
           gainNode.connect(masterGain);
         }
 
-        audioEl.play().catch(function(e) {
+        audioEl.play().then(function() {
+          // 播放成功后再取消静音（音频通过 gainNode=0 控制音量）
+          audioEl.muted = false;
+        }).catch(function(e) {
           console.warn('BGM 预播放失败 (' + bgm.url + '):', e.message);
         });
 
